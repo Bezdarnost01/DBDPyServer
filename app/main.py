@@ -1,9 +1,11 @@
 import logging
+import asyncio
 import uvicorn
 import sys
 from fastapi import FastAPI
 
 from api.v1 import routers
+from models import init_all_databases
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,7 +16,11 @@ logging.basicConfig(
     ]
 )
 
-app = FastAPI()
+async def main(app: FastAPI):
+    await init_all_databases()
+    yield
+
+app = FastAPI(lifespan=main)
 
 for router in routers:
     app.include_router(router)

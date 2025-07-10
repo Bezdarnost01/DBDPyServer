@@ -9,7 +9,7 @@ MOSCOW = pytz.timezone("Europe/Moscow")
 class Users(UsersBase):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
-    user_id = Column(String, default=UserWorker.generate_unique_user_id())
+    user_id = Column(String, default=UserWorker.generate_unique_user_id)
     steam_id = Column(BigInteger, default=None)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(MOSCOW))
     last_login = Column(DateTime(timezone=True), default=None)

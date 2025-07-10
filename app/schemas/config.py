@@ -18,5 +18,9 @@ class Settings(BaseSettings):
     @classmethod
     def model_validate_json(cls, value: str):
         return json.loads(value)
+    
+    @property
+    def save_key_bytes(self) -> bytes:
+        return self.save_key.encode()
 
 settings = Settings()

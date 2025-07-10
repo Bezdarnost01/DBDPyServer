@@ -15,7 +15,7 @@ class UserWorker:
     - Получение дефолтного сейва из файла.
     """
 
-    _default_save_path: str = os.path.join("assets", "default_save.json")
+    _default_save_path: str = os.path.join("..", "assets", "default_save.json")
     _cached_default_save: Optional[str] = None
 
     @staticmethod
@@ -65,7 +65,7 @@ class UserWorker:
         data = bytearray(data)
         for i in range(len(data)):
             data[i] = (data[i] - 1) % 256
-        cipher = AES.new(settings.save_key, AES.MODE_ECB)
+        cipher = AES.new(settings.save_key_bytes, AES.MODE_ECB)
         pad = 32 - (len(data) % 32) if len(data) % 32 != 0 else 32
         data += bytes([0] * pad)
         enc = cipher.encrypt(bytes(data))
@@ -87,7 +87,7 @@ class UserWorker:
         assert encrypted.startswith("DbdDAgAC"), "Invalid DBD save format!"
         encrypted = encrypted[8:]
         data = base64.b64decode(encrypted)
-        cipher = AES.new(settings.save_key, AES.MODE_ECB)
+        cipher = AES.new(settings.save_key_bytes, AES.MODE_ECB)
         data = cipher.decrypt(data)
         data = bytearray(data)
         last_nonzero = len(data) - 1
