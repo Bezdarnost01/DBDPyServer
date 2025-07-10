@@ -16,5 +16,6 @@ class UserRead(BaseModel):
     created_at: datetime
     last_login: Optional[datetime] = None
     save_data: str
+    is_banned: bool
 
     model_config = ConfigDict(from_attributes=True)

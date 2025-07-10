@@ -9,3 +9,10 @@ class VersionResponse(BaseModel):
 
 class ContentVersionResponse(BaseModel):
     availableVersions: Dict[str, str]
+
+class EacChallengeResponse(BaseModel):
+    challenge: str
+    
+class ValidateChallengeResponse(BaseModel):
+    valid: bool
+    stateUpdated: bool

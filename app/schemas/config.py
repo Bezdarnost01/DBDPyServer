@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from schemas.utils import ContentVersionResponse, ValidateChallengeResponse
 from pydantic import BaseModel
-from schemas.utils import ContentVersionResponse
 import json
 
 class VersionConfig(BaseModel):
@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     version: VersionConfig
     content_version: ContentVersionResponse
     save_key: str
+    eac_challenge: str
+    validate_challenge: ValidateChallengeResponse
 
     model_config = SettingsConfigDict(env_file="configs/.env", env_file_encoding="utf-8")
 
