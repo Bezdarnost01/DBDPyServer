@@ -4,45 +4,40 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.config import settings
-from db.users import get_async_session
+from db.users import get_user_session
+from db.sessions import get_sessions_session
 from utils.utils import Utils 
 from utils.sessions import SessionWorker
 from schemas.users import UserCreate
 from crud.users import UserManager
-# from crud.sessions import SessionManager   # предположим, будешь делать такую CRUD для сессий
+from crud.sessions import SessionManager
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Users"])
 
-SESSION_LENGTH = 60 * 30  # 30 минут (секунд)
+SESSION_LENGTH = 60 * 60
 
 @router.post("/auth/provider/steam/login")
-async def steam_login(
-    token: str,
-    response: Response,  # чтобы выставлять куки
-    db: AsyncSession = Depends(get_async_session),
-):
+async def steam_login(token: str, response: Response,  
+                      db_users: AsyncSession = Depends(get_user_session), 
+                      db_sessions: AsyncSession = Depends(get_sessions_session)):
     steam_id = Utils.token_to_steam_id(token)
     if not steam_id:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    # Создать или получить пользователя
     user_in = UserCreate(steam_id=steam_id)
-    user = await UserManager.create_user(db, user_in=user_in)
+    user = await UserManager.create_user(db_users, user_in=user_in)
     if user is None:
-        user = await UserManager.get_user(db, steam_id=steam_id)
-    await UserManager.update_last_login(db, steam_id=steam_id)
+        user = await UserManager.get_user(db_users, steam_id=steam_id)
+    await UserManager.update_last_login(db_users, steam_id=steam_id)
 
-    # Генерим cloud_id (user_id)
     cloud_id = user.user_id
     now = int(time.time())
     token_id = str(uuid.uuid4())
     session_id = SessionWorker.gen_bhvr_session(now=now, valid_for=SESSION_LENGTH)
     expire = now + SESSION_LENGTH
 
-    # Здесь можно добавить создание записи сессии в базу (псевдокод):
-    # await SessionManager.create_session(db, user_id=cloud_id, token_id=token_id, bhvr_session=session_id, expire=expire)
+    await SessionManager.create_session(db_sessions, bhvr_session=session_id, steam_id=steam_id, expires=expire)
 
-    # Выставить bhvrSession как cookie
     response.set_cookie(
         key="bhvrSession",
         value=session_id,
@@ -74,6 +69,5 @@ async def steam_login(
         "expire": expire,
         "userId": cloud_id,
         "token": token_id,
-        # опционально: можешь добавить поля platform/os/lang/ip, если тебе надо
     }
     return payload

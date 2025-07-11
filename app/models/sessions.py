@@ -5,7 +5,6 @@ from datetime import datetime
 
 MOSCOW = pytz.timezone("Europe/Moscow")
 
-
 class Sessions(SessionsBase):
     __tablename__ = "sessions"
 

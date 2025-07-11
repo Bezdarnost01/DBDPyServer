@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     save_key: str
     eac_challenge: str
     validate_challenge: ValidateChallengeResponse
+    cleanup_interval: int
 
     model_config = SettingsConfigDict(env_file="configs/.env", env_file_encoding="utf-8")
 

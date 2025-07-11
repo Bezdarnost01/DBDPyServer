@@ -13,6 +13,6 @@ class UsersBase(DeclarativeBase):
 user_engine = create_async_engine(USERS_DATABASE_URL)
 users_sessionmaker = async_sessionmaker(user_engine, expire_on_commit=False)
 
-async def get_async_session() -> AsyncSession:
+async def get_user_session() -> AsyncSession:
     async with users_sessionmaker() as session:
         yield session
