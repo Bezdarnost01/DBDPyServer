@@ -20,3 +20,19 @@ class Utils:
             return str(steam_id_int)
         except (ValueError, IndexError):
             return None
+    
+    @staticmethod
+    def xp_to_player_level(xp: int):
+        level_version = 34
+        prestige_level = 0
+        level = min(xp // 2100 + 1, 100)
+        current_xp = xp % 2100
+        current_xp_upper_bound = 2100
+        return {
+            "totalXp": xp,
+            "levelVersion": level_version,
+            "level": level,
+            "prestigeLevel": prestige_level,
+            "currentXp": current_xp,
+            "currentXpUpperBound": current_xp_upper_bound
+        }

@@ -1,7 +1,7 @@
 import logging
 import uuid
 import time
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.config import settings
 from db.users import get_user_session
@@ -36,7 +36,7 @@ async def steam_login(token: str, response: Response,
     session_id = SessionWorker.gen_bhvr_session(now=now, valid_for=SESSION_LENGTH)
     expire = now + SESSION_LENGTH
 
-    await SessionManager.create_session(db_sessions, bhvr_session=session_id, steam_id=steam_id, expires=expire)
+    await SessionManager.create_session(db_sessions, bhvr_session=session_id, user_id=user.user_id, steam_id=steam_id, expires=expire)
 
     response.set_cookie(
         key="bhvrSession",
@@ -71,3 +71,35 @@ async def steam_login(token: str, response: Response,
         "token": token_id,
     }
     return payload
+
+@router.post("/me/logout")
+async def logout(request: Request,
+                 db_session: AsyncSession = Depends(get_sessions_session)):
+    
+    bhvr_session = request.cookies.get("bhvrSession")
+    if not bhvr_session:
+        raise HTTPException(status_code=401, detail="No session cookie")
+    
+    await SessionManager.delete_session(db=db_session, bhvr_session=bhvr_session)
+
+@router.post("/me/richPresence")
+async def rich_presence(request: Request):
+    body = await request.json()
+
+    game_state = body.get("gameState", "InMenus")
+    game_version = body.get("gameVersion", "8.6.1_2377945live")
+    rich_presence_status = body.get("gameSpecificData", {}).get("richPresenceStatus", "InMenus")
+    online = body.get("online", True)
+    user_type = body.get("userType", "player")
+
+    return {
+        "currentProvider": "steam",
+        "gameSpecificData": {
+            "richPresenceStatus": rich_presence_status,
+            "richPresencePlatform": "steam"
+        },
+        "gameState": game_state,
+        "gameVersion": game_version,
+        "online": online,
+        "userType": user_type
+    }

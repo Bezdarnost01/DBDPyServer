@@ -11,13 +11,14 @@ class SessionManager:
     Менеджер для работы сессиями пользователей.
     """
     @staticmethod
-    async def create_session(db: AsyncSession, bhvr_session: str, steam_id: int, expires: int) -> Sessions:
+    async def create_session(db: AsyncSession, bhvr_session: str, user_id: str, steam_id: int, expires: int) -> Sessions:
         """
         Создаёт новую сессию пользователя.
 
         Args:
             db (AsyncSession): Сессия БД.
             bhvr_session (str): Строка идентификатора сессии.
+            user_id (str): user_id Пользователя
             steam_id (int): Steam ID пользователя.
             expires (int): Время истечения сессии (UNIX timestamp).
 
@@ -29,6 +30,7 @@ class SessionManager:
 
         session = Sessions(
             bhvr_session=bhvr_session,
+            user_id=user_id,
             steam_id=steam_id,
             expires=expires,
             created_at=datetime.now(MOSCOW),
@@ -96,6 +98,23 @@ class SessionManager:
         result = await db.execute(stmt)
         session = result.scalar_one_or_none()
         return session.steam_id if session else None
+    
+    @staticmethod
+    async def get_user_id_by_session(db: AsyncSession, bhvr_session: str) -> str | None:
+        """
+        Получает user_id по bhvr_session.
+
+        Args:
+            db (AsyncSession): Сессия БД.
+            bhvr_session (str): Идентификатор сессии.
+
+        Returns:
+            str | None: User ID или None если не найдено.
+        """
+        stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        return session.user_id if session else None
 
     @staticmethod
     async def refresh_session_if_needed(db: AsyncSession, bhvr_session: str, threshold: int = 15 * 60, extend_seconds: int = 40 * 60) -> bool:

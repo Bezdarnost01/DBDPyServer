@@ -1,3 +1,7 @@
+from .users import Users
+from .inventory import UserInventory
+from .wallet import UserWallet
+
 from db.users import user_engine, UsersBase
 from db.sessions import sessions_engine, SessionsBase
 

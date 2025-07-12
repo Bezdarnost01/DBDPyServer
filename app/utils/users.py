@@ -103,22 +103,26 @@ class UserWorker:
         return out.decode("utf-16le")
 
     @classmethod
-    def get_default_save(cls) -> str:
+    def get_default_save(cls) -> bytes:
         """
-        Загружает и возвращает дефолтный сейв в виде шифрованной строки для DBD.
+        Загружает и возвращает дефолтный сейв в виде шифрованных байтов для DBD.
         Кэширует результат в памяти (читает файл только при первом вызове).
 
         Returns:
-            str: Шифрованная строка дефолтного сейва (для записи пользователю).
+            bytes: Шифрованный дефолтный сейв (для записи пользователю).
         Raises:
             FileNotFoundError: Если файл шаблона не найден.
         """
         if cls._cached_default_save is None:
             with open(cls._default_save_path, encoding='utf-8') as f:
                 data = json.load(f)
-            cls._cached_default_save = cls.encrypt_save_dbhvr(data)
+            encrypted_str = cls.encrypt_save_dbhvr(data)
+            if isinstance(encrypted_str, str):
+                cls._cached_default_save = encrypted_str.encode('utf-8')
+            else:
+                cls._cached_default_save = encrypted_str
         return cls._cached_default_save
-
+    
     @staticmethod
     def save_json_to_encrypted(save_json: dict) -> str:
         """

@@ -16,3 +16,6 @@ class EacChallengeResponse(BaseModel):
 class ValidateChallengeResponse(BaseModel):
     valid: bool
     stateUpdated: bool
+
+class ClientVersionResponse(BaseModel):
+    isValid: bool

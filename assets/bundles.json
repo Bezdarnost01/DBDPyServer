@@ -1,0 +1,99 @@
+{
+    "availableBundles": [
+        {
+            "id": "cellsPack1",
+            "categories": ["currencyPack", "premiumItemPack"],
+            "defaultCost": [{"currencyId": "USCents", "price": 500}],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 500}],
+            "awardedItems": [{"objectId": "IO_004", "quantity": 1}],
+            "localCost": {"price": 12000, "currency": "UYU", "base": 100},
+            "isPurchasable": true,
+            "platformId": "555"
+        },
+        {
+            "id": "cellsPack2",
+            "categories": ["currencyPack", "premiumItemPack"],
+            "defaultCost": [{"currencyId": "USCents", "price": 1000}],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 1100}],
+            "awardedItems": [{"objectId": "IO_004", "quantity": 1}],
+            "localCost": {"price": 24000, "currency": "UYU", "base": 100},
+            "isPurchasable": true,
+            "platformId": "556"
+        },
+        {
+            "id": "cellsPack3",
+            "categories": ["currencyPack", "premiumItemPack"],
+            "defaultCost": [{"currencyId": "USCents", "price": 2000}],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 2250}],
+            "awardedItems": [{"objectId": "IO_004", "quantity": 1}],
+            "localCost": {"price": 48000, "currency": "UYU", "base": 100},
+            "isPurchasable": true,
+            "platformId": "557"
+        },
+        {
+            "id": "cellsPack4",
+            "categories": ["currencyPack", "premiumItemPack"],
+            "defaultCost": [{"currencyId": "USCents", "price": 3500}],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 4025}],
+            "awardedItems": [{"objectId": "IO_004", "quantity": 1}],
+            "localCost": {"price": 84000, "currency": "UYU", "base": 100},
+            "isPurchasable": true,
+            "platformId": "558"
+        },
+        {
+            "id": "cellsPack5",
+            "categories": ["currencyPack", "premiumItemPack"],
+            "defaultCost": [{"currencyId": "USCents", "price": 5000}],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 6000}],
+            "awardedItems": [{"objectId": "IO_004", "quantity": 1}],
+            "localCost": {"price": 120000, "currency": "UYU", "base": 100},
+            "isPurchasable": true,
+            "platformId": "559"
+        },
+        {
+            "id": "cellsPack6",
+            "categories": ["currencyPack", "premiumItemPack"],
+            "defaultCost": [{"currencyId": "USCents", "price": 10000}],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 12500}],
+            "awardedItems": [{"objectId": "IO_004", "quantity": 1}],
+            "localCost": {"price": 240000, "currency": "UYU", "base": 100},
+            "isPurchasable": true,
+            "platformId": "560"
+        },
+        {
+            "id": "cellsPack_10",
+            "categories": ["currencyPack"],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 10}],
+            "awardedItems": [],
+            "isPurchasable": false
+        },
+        {
+            "id": "cellsPack_15",
+            "categories": ["currencyPack"],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 15}],
+            "awardedItems": [],
+            "isPurchasable": false
+        },
+        {
+            "id": "cellsPack_25",
+            "categories": ["currencyPack"],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 25}],
+            "awardedItems": [],
+            "isPurchasable": false
+        },
+        {
+            "id": "cellsPack_50",
+            "categories": ["currencyPack"],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 50}],
+            "awardedItems": [],
+            "isPurchasable": false
+        },
+        {
+            "id": "cellsPack_75",
+            "categories": ["currencyPack"],
+            "awardedCurrencies": [{"currencyId": "Cells", "quantity": 75}],
+            "awardedItems": [],
+            "isPurchasable": false
+        }
+    ]
+}

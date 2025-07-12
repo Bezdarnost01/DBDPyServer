@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     eac_challenge: str
     validate_challenge: ValidateChallengeResponse
     cleanup_interval: int
+    bonus_bloodpoints: int
+    next_rank_reset_date: int
 
     model_config = SettingsConfigDict(env_file="configs/.env", env_file_encoding="utf-8")
 
