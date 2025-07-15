@@ -5,8 +5,7 @@ STARTING_WALLET = [
 ]
 
 CURRENCIES = [
-    "Shards", "Cells", "USCents", "BonusBloodpoints", "HalloweenCoins",
-    "LunarNewYearCoins", "HalloweenEventCurrency", "Bloodpoints",
-    "Keystones", "ObsidianBones", "Dust", "HardCurrency",
-    "Halloween2018Coins", "LunarCoins", "DrawTicket"
+    "Dust", "Bloodpoints", "BonusBloodpoints", "HardCurrency", "testCurrency",
+    "Shards", "Cells", "USCents", "Halloween2018Coins", "HalloweenCoins",
+    "LunarCoins", "LunarNewYearCoins", "HalloweenEventCurrency"
 ]

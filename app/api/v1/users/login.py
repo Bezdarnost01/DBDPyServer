@@ -83,14 +83,27 @@ async def logout(request: Request,
     await SessionManager.delete_session(db=db_session, bhvr_session=bhvr_session)
 
 @router.post("/me/richPresence")
-async def rich_presence(request: Request):
+async def rich_presence(request: Request,
+                        db_users: AsyncSession = Depends(get_user_session),
+                        db_sessions: AsyncSession = Depends(get_sessions_session)):
     body = await request.json()
 
     game_state = body.get("gameState", "InMenus")
     game_version = body.get("gameVersion", "8.6.1_2377945live")
     rich_presence_status = body.get("gameSpecificData", {}).get("richPresenceStatus", "InMenus")
     online = body.get("online", True)
-    user_type = body.get("userType", "player")
+    user_type = body.get("userType", None)
+
+    if user_type == "player":
+        bhvr_session = request.cookies.get("bhvrSession")
+        if not bhvr_session:
+            raise HTTPException(status_code=401, detail="No session cookie")
+        
+        user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Session not found")
+    
+        await UserManager.update_user_profile(db=db_users, user_id=user_id, user_state=game_state)
 
     return {
         "currentProvider": "steam",

@@ -3,6 +3,8 @@ import uuid
 import json
 import zlib
 import base64
+from sqlalchemy.ext.asyncio import AsyncSession
+from schemas.users import UserStats
 from typing import Any, Optional
 from schemas.config import settings
 from Crypto.Cipher import AES
@@ -136,3 +138,89 @@ class UserWorker:
         Превращает зашифрованный сейв DBD в словарь.
         """
         return json.loads(UserWorker.decrypt_save_dbhvr(save_encrypted))
+    
+    @staticmethod
+    async def set_experience_in_save(db: AsyncSession, *, user_id: str = None, steam_id: int = None, new_experience: int):
+        """
+        Устанавливает (обновляет) значение опыта (experience) пользователя в его сейве.
+
+        Args:
+            db (AsyncSession): Сессия базы данных.
+            user_id (str, optional): UUID пользователя (cloud_id). Необязателен, если есть steam_id.
+            steam_id (int, optional): Steam ID пользователя. Необязателен, если есть user_id.
+            new_experience (int): Новое значение опыта (experience) для пользователя.
+
+        Returns:
+            bool: True, если обновление прошло успешно, иначе Exception.
+
+        Raises:
+            Exception: Если пользователь не найден.
+        """
+        from crud.users import UserManager
+        user = await UserManager.get_user(db, user_id=user_id, steam_id=steam_id)
+        if not user:
+            raise Exception("User not found")
+        save_dict = UserWorker.encrypted_to_json(user.save_data.decode("utf-8"))
+
+        if "experience" in save_dict:
+            save_dict["experience"] = new_experience
+        else:
+            items = list(save_dict.items())
+            new_items = []
+            inserted = False
+            for k, v in items:
+                new_items.append((k, v))
+                if k == "lastSurvivorMatchEndTime":
+                    new_items.append(("experience", new_experience))
+                    inserted = True
+            if not inserted:
+                new_items.append(("experience", new_experience))
+            save_dict = dict(new_items)
+
+        encrypted_save = UserWorker.save_json_to_encrypted(save_dict)
+        await UserManager.update_save_data(
+            db,
+            user_id=user_id,
+            steam_id=steam_id,
+            save_data=encrypted_save.encode("utf-8")
+        )
+        return True
+
+    @staticmethod
+    async def get_stats_from_save(db: AsyncSession, *, user_id: str = None, steam_id: int = None) -> dict:
+        """
+        Возвращает основную игровую статистику пользователя из его сейва в виде объекта UserStats (Pydantic).
+
+        Args:
+            db (AsyncSession): Сессия базы данных.
+            user_id (str, optional): UUID пользователя (cloud_id).
+            steam_id (int, optional): Steam ID пользователя.
+
+        Returns:
+            UserStats: Pydantic-модель с ключевой статистикой игрока.
+
+        Raises:
+            Exception: Если пользователь не найден.
+        """
+        from crud.users import UserManager
+        user = await UserManager.get_user(db, user_id=user_id, steam_id=steam_id)
+        if not user:
+            raise Exception("User not found")
+        save_dict = UserWorker.encrypted_to_json(user.save_data.decode("utf-8"))
+
+        stats = {
+            "experience": save_dict.get("experience", 0),
+            "playerUId": save_dict.get("playerUId"),
+            "selectedCamperIndex": save_dict.get("selectedCamperIndex"),
+            "selectedSlasherIndex": save_dict.get("selectedSlasherIndex"),
+            "firstTimePlaying": save_dict.get("firstTimePlaying"),
+            "consecutiveMatchStreak": save_dict.get("consecutiveMatchStreak"),
+            "currentSeasonTicks": save_dict.get("currentSeasonTicks"),
+            "lastConnectedCharacterIndex": save_dict.get("lastConnectedCharacterIndex"),
+            "disconnectPenaltyTime": save_dict.get("disconnectPenaltyTime"),
+            "lastMatchEndTime": save_dict.get("lastMatchEndTime"),
+            "lastMatchStartTime": save_dict.get("lastMatchStartTime"),
+            "lastKillerMatchEndTime": save_dict.get("lastKillerMatchEndTime"),
+            "lastSurvivorMatchEndTime": save_dict.get("lastSurvivorMatchEndTime"),
+        }
+        return UserStats(**stats)

@@ -1,4 +1,9 @@
-from typing import Optional
+import httpx
+from typing import Optional, List
+
+STEAM_API_KEY = '3DF53DC286EA45499117277D037D87C3'  # впиши свой ключ!
+STEAM_API_URL = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
+
 
 class Utils:
     @staticmethod
@@ -36,3 +41,15 @@ class Utils:
             "currentXp": current_xp,
             "currentXpUpperBound": current_xp_upper_bound
         }
+    
+    async def fetch_names_batch(steam_ids: List[str]) -> dict:
+        async with httpx.AsyncClient() as client:
+            ids_str = ','.join(steam_ids)
+            params = {
+                'key': STEAM_API_KEY,
+                'steamids': ids_str
+            }
+            resp = await client.get(STEAM_API_URL, params=params)
+            data = resp.json()
+            # Вернет dict steamid: name
+            return {p['steamid']: p['personaname'] for p in data['response']['players']}

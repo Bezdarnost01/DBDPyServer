@@ -5,6 +5,7 @@ from sqlalchemy import select, or_
 from models.users import Users as DBUser
 from models.inventory import UserInventory
 from models.wallet import UserWallet
+from models.profile import UserProfile
 from schemas.users import UserCreate
 
 MOSCOW = pytz.timezone("Europe/Moscow")
@@ -25,14 +26,18 @@ class UserManager:
         result = await db.execute(select(DBUser).where(DBUser.steam_id == user_in.steam_id))
         if result.scalar_one_or_none():
             return None
-        
+
         new_user = DBUser(
-            steam_id = user_in.steam_id
+            steam_id=user_in.steam_id,
         )
 
         db.add(new_user)
         await db.commit()
         await db.refresh(new_user)
+
+        user_profile = UserProfile(user_id=new_user.user_id)
+        db.add(user_profile)
+        await db.commit()
 
         from configs.config import STARTING_WALLET
         for entry in STARTING_WALLET:
@@ -65,6 +70,66 @@ class UserManager:
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
     
+    @staticmethod
+    async def get_user_profile(db: AsyncSession, user_id: str) -> UserProfile | None:
+        """
+        Получает профиль пользователя по user_id.
+
+        Args:
+            db (AsyncSession): Асинхронная сессия SQLAlchemy.
+            user_id (str): Уникальный идентификатор пользователя.
+
+        Returns:
+            UserProfile | None: Объект профиля пользователя, если найден, иначе None.
+
+        Пример использования:
+        ---------------------
+        profile = await UserManager.get_user_profile(db, user_id="abc123")
+        if profile:
+            print(profile.user_name, profile.xp)
+        else:
+            print("Профиль не найден")
+        """
+        stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def update_user_profile(db: AsyncSession, user_id: str, **fields) -> UserProfile | None:
+        """
+        Обновляет поля профиля пользователя по user_id.
+
+        Args:
+            db (AsyncSession): Асинхронная сессия SQLAlchemy.
+            user_id (str): Уникальный идентификатор пользователя.
+            **fields: Произвольные поля для обновления (например, xp=1000, user_name="NewName").
+
+        Returns:
+            UserProfile | None: Обновлённый профиль пользователя, если найден, иначе None.
+
+        Пример использования:
+        ---------------------
+        profile = await UserManager.update_user_profile(
+            db,
+            user_id="abc123",
+            xp=2000,
+            user_name="AwesomePlayer",
+            rank=5
+        )
+        if profile:
+            print("Профиль обновлён:", profile.user_name, profile.xp)
+        else:
+            print("Профиль не найден")
+        """
+        profile = await UserManager.get_user_profile(db, user_id=user_id)
+        if not profile:
+            return None
+        for key, value in fields.items():
+            setattr(profile, key, value)
+        await db.commit()
+        await db.refresh(profile)
+        return profile
+
     @staticmethod
     async def update_save_data(db: AsyncSession, *, user_id: str = None, steam_id: int = None, save_data: bytes) -> DBUser | None:
         """

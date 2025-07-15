@@ -6,6 +6,7 @@ from db.sessions import get_sessions_session
 from crud.sessions import SessionManager
 from crud.users import UserManager
 from utils.utils import Utils
+from utils.users import UserWorker
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Users"])
 
@@ -117,15 +118,13 @@ async def get_localized_currencies_after_login(
     
     wallet = await UserManager.get_wallet(db=db_users, user_id=user.id) or []
     balances = {w.currency: w.balance for w in wallet}
-
+    
     from configs.config import CURRENCIES
+
     result = [
         {
             "balance": balances.get(currency, 0),
-            "currency": currency,
-            "disabled": False,
-            "providerBalances": {},
-            "userId": str(user.user_id)
+            "currency": currency
         }
         for currency in CURRENCIES
     ]
@@ -135,24 +134,50 @@ async def get_localized_currencies_after_login(
 async def get_wallet_currencies(
     request: Request,
     db_users: AsyncSession = Depends(get_user_session),
-    db_sessions = Depends(get_sessions_session)
+    db_sessions=Depends(get_sessions_session)
 ):
+    from configs.config import CURRENCIES
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         return Response(status_code=404)
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         return Response(status_code=404)
-    wallets = await UserManager.get_wallet(db_users, user_id)
-    wallets_dict = [
-        {
-            "currencyId": w.currency,
-            "balance": w.balance
-        }
-        for w in wallets
-    ]
+
+    wallets = await UserManager.get_wallet(db_users, user_id) or []
+    balances = {w.currency: w.balance for w in wallets}
+
+    user = await UserManager.get_user(db_users, user_id=user_id)
+    if not user:
+        return Response(status_code=404)
+    from utils.users import UserWorker
+    stats = await UserWorker.get_stats_from_save(db_users, user_id=user_id)
+    bloodpoints_save = getattr(stats, "experience", 0)
+
+    bloodpoints_db = balances.get("Bloodpoints", 0)
+
+    new_bloodpoints = bloodpoints_save + bloodpoints_db
+
+    await UserWorker.set_experience_in_save(db_users, user_id=user_id, new_experience=new_bloodpoints)
+
+    await UserManager.set_wallet_balance(db=db_users, user_id=user_id, currency="Bloodpoints", balance=new_bloodpoints)
+
+    wallets_dict = []
+    for currency in CURRENCIES:
+        if currency == "Bloodpoints":
+            value = new_bloodpoints
+        else:
+            value = balances.get(currency, 0)
+        wallets_dict.append({
+            "balance": value,
+            "currency": currency
+        })
     return {"list": wallets_dict}
 
+@router.post("/wallet/withdraw")
+async def wallet_withdraw():
+        return {"ok": True}
 
 @router.post("/playername/steam/{steam_name}")
 async def get_player_name(
@@ -175,6 +200,8 @@ async def get_player_name(
 
     tag = str(user_id).split("-")[0][:4]
     player_name = f"{steam_name}#{tag}"
+
+    await UserManager.update_user_profile(db=db_users, user_id=user_id, steam_id=user.steam_id, user_name=steam_name, user_code=tag)
 
     return {
         "providerPlayerNames": {"steam": steam_name},
@@ -235,8 +262,8 @@ async def get_ranks_pips(
             status_code=404,
             detail={"code": 404, "message": "Session not found", "data": {}}
         )
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
+    user_profile = await UserManager.get_user_profile(db_users, user_id=user_id)
+    if not user_profile:
         raise HTTPException(
             status_code=404,
             detail={"code": 404, "message": "User not found", "data": {}}
@@ -245,8 +272,8 @@ async def get_ranks_pips(
     return {
         "nextRankResetDate": settings.next_rank_reset_date,
         "pips": {
-            "survivorPips": user.survivor_pips or 0,
-            "killerPips": user.killer_pips or 0
+            "survivorPips": user_profile.survivor_pips or 0,
+            "killerPips": user_profile.killer_pips or 0
         },
         "seasonRefresh": False
     }
@@ -263,21 +290,21 @@ async def put_ranks_pips(
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(404, detail={"code": 404, "message": "Session not found", "data": {}})
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
+    user_profile = await UserManager.get_user_profile(db_users, user_id=user_id)
+    if not user_profile:
         raise HTTPException(404, detail={"code": 404, "message": "User not found", "data": {}})
     
     body = await request.json()
     if body.get("forceReset"):
-        user.killer_pips = 0
-        user.survivor_pips = 0
+        user_profile.killer_pips = 0
+        user_profile.survivor_pips = 0
     else:
         if "killerPips" in body and isinstance(body["killerPips"], int) and body["killerPips"] >= 0:
-            user.killer_pips = body["killerPips"]
+            user_profile.killer_pips = body["killerPips"]
         if "survivorPips" in body and isinstance(body["survivorPips"], int) and body["survivorPips"] >= 0:
-            user.survivor_pips = body["survivorPips"]
+            user_profile.survivor_pips = body["survivorPips"]
     await db_users.commit()
-    await db_users.refresh(user)
+    await db_users.refresh(user_profile)
     return {"code": 200, "message": "OK"}
 
 @router.get("/players/ban/status")
