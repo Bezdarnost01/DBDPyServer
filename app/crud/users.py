@@ -1,7 +1,7 @@
 import pytz
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, bindparam
 from models.users import Users as DBUser
 from models.inventory import UserInventory
 from models.wallet import UserWallet
@@ -398,3 +398,13 @@ class UserManager:
         await db.commit()
         await db.refresh(entry)
         return entry
+    
+    @staticmethod
+    async def get_user_ids_by_steam_ids(db, steam_ids):
+        if not steam_ids:
+            return {}
+        stmt = select(DBUser.steam_id, DBUser.user_id).where(
+            DBUser.steam_id.in_(bindparam('steam_ids', expanding=True))
+        )
+        result = await db.execute(stmt, {"steam_ids": steam_ids})
+        return {str(row.steam_id): row.user_id for row in result.fetchall()}

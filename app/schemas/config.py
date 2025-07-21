@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cleanup_interval: int
     bonus_bloodpoints: int
     next_rank_reset_date: int
+    redis_url: str
 
     model_config = SettingsConfigDict(env_file="configs/.env", env_file_encoding="utf-8")
 

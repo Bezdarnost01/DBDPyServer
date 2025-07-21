@@ -3,8 +3,10 @@ import asyncio
 import uvicorn
 import sys
 from fastapi import FastAPI
+import redis.asyncio as redis
 
 from api.v1 import routers
+from middleware.http_middleware import log_http_request_time
 from models import init_all_databases
 from schemas.config import settings
 from crud.sessions import SessionManager
@@ -19,6 +21,8 @@ logging.basicConfig(
     ]
 )
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 async def regular_session_cleanup():
     while True:
         async with sessions_sessionmaker() as db:
@@ -30,20 +34,15 @@ async def regular_session_cleanup():
 
 async def main(app: FastAPI):
     await init_all_databases()
+    app.state.redis = redis.from_url(settings.redis_url, decode_responses=True)
     asyncio.create_task(regular_session_cleanup())
     yield
+    await app.state.redis.close()
 
 app = FastAPI(lifespan=main)
+
+app.middleware("http")(log_http_request_time)
 
 for router in routers:
     app.include_router(router)
 
-if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=443,
-        reload=True,
-        ssl_keyfile="/etc/letsencrypt/live/dbdclub.live/privkey.pem",
-        ssl_certfile="/etc/letsencrypt/live/dbdclub.live/fullchain.pem"
-    )

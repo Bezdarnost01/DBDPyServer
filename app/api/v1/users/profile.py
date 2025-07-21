@@ -7,6 +7,9 @@ from crud.sessions import SessionManager
 from crud.users import UserManager
 from utils.utils import Utils
 from utils.users import UserWorker
+from dependency.redis import Redis
+import logging
+logger = logging.getLogger(__name__) 
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Users"])
 
@@ -23,11 +26,7 @@ async def get_inventory(request: Request,
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
     
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
-        raise HTTPException(404, detail="User not found")
-
-    inventory = await UserManager.get_inventory(db_users, user_id=user.id) or []
+    inventory = await UserManager.get_inventory(db_users, user_id=user_id) or []
     inventory_list = []
     for item in inventory:
         inventory_list.append({
@@ -151,24 +150,10 @@ async def get_wallet_currencies(
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         return Response(status_code=404)
-    from utils.users import UserWorker
-    stats = await UserWorker.get_stats_from_save(db_users, user_id=user_id)
-    bloodpoints_save = getattr(stats, "experience", 0)
-
-    bloodpoints_db = balances.get("Bloodpoints", 0)
-
-    new_bloodpoints = bloodpoints_save + bloodpoints_db
-
-    await UserWorker.set_experience_in_save(db_users, user_id=user_id, new_experience=new_bloodpoints)
-
-    await UserManager.set_wallet_balance(db=db_users, user_id=user_id, currency="Bloodpoints", balance=new_bloodpoints)
 
     wallets_dict = []
     for currency in CURRENCIES:
-        if currency == "Bloodpoints":
-            value = new_bloodpoints
-        else:
-            value = balances.get(currency, 0)
+        value = balances.get(currency, 0)
         wallets_dict.append({
             "balance": value,
             "currency": currency
@@ -242,7 +227,7 @@ async def push_save_state(
 
 @router.post("/extensions/ownedProducts/reportOwnedProducts")
 async def report_owned_products(request: Request):
-    return {"status": "Ok"}
+    return Response(status_code=403)
 
 @router.get("/ranks/pips")
 async def get_ranks_pips(
@@ -324,7 +309,10 @@ async def check_ban(request: Request,
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return {"isBanned": bool(getattr(user, "is_banned", False))}
+    return {
+        "isBanned": bool(getattr(user, "is_banned", False)),
+        "HuliPalish? 0_o": "https://ibb.co/jvr26bXD"
+    }
 
 @router.post("/extensions/playerLevels/getPlayerLevel")
 async def get_player_level(
@@ -361,3 +349,152 @@ async def get_player_level(
 @router.post("/players/ban/decayAndGetDisconnectionPenaltyPoints")
 async def post_penalty_points():
     return {"penaltyPoints":0}
+
+@router.post("/players/friends/sync")
+async def friends_sync(
+    req: Request,
+    db_users: AsyncSession = Depends(get_user_session),
+    db_sessions: AsyncSession = Depends(get_sessions_session),
+    redis = Depends(Redis.get_redis)
+):
+    bhvr_session = req.cookies.get("bhvrSession")
+    if not bhvr_session:
+        raise HTTPException(status_code=401, detail="No session cookie")
+    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    body = await req.json()
+    ids = body.get("ids", [])
+    cid = user_id
+
+    await Redis.set_friend_ids(redis, cid, ids, ttl=15)
+
+    cached_friends = await Redis.get_friends_list(redis, cid, ids)
+    if cached_friends:
+        return {"friends": cached_friends}
+
+    steam_to_cloud = await Redis.get_cloud_ids(redis, ids, db_users)
+    steamid_to_name = await Redis.get_steam_names(redis, ids)
+
+    friends = []
+    for sid in ids:
+        friend_cloud_id = steam_to_cloud.get(str(sid))
+        pname = steamid_to_name.get(sid, "Unknown")
+        if friend_cloud_id:
+            friends.append({
+                "userId": cid,
+                "friendId": friend_cloud_id,
+                "status": "confirmed",
+                "platformIds": {"steam": sid},
+                "friendPlayerName": {
+                    "userId": friend_cloud_id,
+                    "providerPlayerNames": {"steam": pname},
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
+                },
+                "favorite": False,
+                "mute": False,
+                "isKrakenOnlyFriend": False
+            })
+
+    await Redis.set_friends_list(redis, cid, ids, friends, ttl=15)
+    return {"friends": friends}
+
+@router.get("/players/{user_id}/friends")
+async def get_friends(
+    user_id: str,
+    platform: str = "steam",
+    db_users: AsyncSession = Depends(get_user_session),
+    redis = Depends(Redis.get_redis)
+):
+
+    ids = await Redis.get_friend_ids(redis, user_id)
+
+    cached_friends = await Redis.get_friends_list(redis, user_id, ids)
+    if cached_friends:
+        return cached_friends
+
+    steam_to_cloud = await Redis.get_cloud_ids(redis, ids, db_users)
+    steamid_to_name = await Redis.get_steam_names(redis, ids)
+
+    friends = []
+    for sid in ids:
+        friend_cloud_id = steam_to_cloud.get(str(sid))
+        pname = steamid_to_name.get(sid, "Unknown")
+        if friend_cloud_id:
+            friends.append({
+                "userId": user_id,
+                "friendId": friend_cloud_id,
+                "status": "confirmed",
+                "platformIds": {"steam": sid},
+                "friendPlayerName": {
+                    "userId": friend_cloud_id,
+                    "providerPlayerNames": {"steam": pname},
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
+                },
+                "favorite": False,
+                "mute": False,
+                "isKrakenOnlyFriend": False
+            })
+
+    await Redis.set_friends_list(redis, user_id, ids, friends, ttl=15)
+    return friends
+
+@router.get("/friends/richPresence/{user_id}")
+async def get_friends_rich_presence(
+    user_id: str,
+    db_users: AsyncSession = Depends(get_user_session),
+    db_sessions: AsyncSession = Depends(get_sessions_session),
+    redis = Depends(Redis.get_redis)
+):
+
+    ids = await Redis.get_friend_ids(redis, user_id)
+    if not ids:
+        return []
+
+    steam_to_cloud = await Redis.get_cloud_ids(redis, ids, db_users)
+    steamid_to_name = await Redis.get_steam_names(redis, ids)
+    online_user_ids = await SessionManager.get_all_online_user_ids(db_sessions)
+
+    rich_presence = []
+    for sid in ids:
+        friend_cloud_id = steam_to_cloud.get(str(sid))
+        pname = steamid_to_name.get(sid, "Unknown")
+        if not friend_cloud_id:
+            continue
+
+        is_online = friend_cloud_id in online_user_ids
+
+        profile = await UserManager.get_user_profile(db_users, friend_cloud_id)
+        if is_online:
+            game_state = profile.user_state if profile and profile.user_state else "InLobby"
+            rich_presence.append({
+                "playerId": friend_cloud_id,
+                "online": True,
+                "gameState": game_state,
+                "gameVersion": "3.6.0_289644live",
+                "gameSpecificData": {
+                    "richPresenceStatus": game_state,
+                    "richPresencePlatform": "steam"
+                },
+                "playerNames": {
+                    "userId": friend_cloud_id,
+                    "providerPlayerNames": {"steam": pname},
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
+                },
+            })
+        else:
+            game_state = profile.user_state if profile and profile.user_state else "InLobby"
+            rich_presence.append({
+                "playerId": friend_cloud_id,
+                "online": False,
+                "gameState": game_state,
+                "gameVersion": "3.6.0_289644live",
+                "playerNames": {
+                    "userId": friend_cloud_id,
+                    "providerPlayerNames": {"steam": pname},
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
+                }
+            })
+
+    return rich_presence

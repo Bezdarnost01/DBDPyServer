@@ -174,3 +174,10 @@ class SessionManager:
         result = await db.execute(stmt)
         count = result.scalar_one()
         return count
+    
+    async def get_all_online_user_ids(db: AsyncSession) -> set[str]:
+        """
+        Возвращает set user_id всех пользователей с активной сессией.
+        """
+        result = await db.execute(select(Sessions.user_id))
+        return set(result.scalars().all())
