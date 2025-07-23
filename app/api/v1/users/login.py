@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.config import settings
 from db.users import get_user_session
+from utils.decorators import log_call
 from db.sessions import get_sessions_session
 from utils.utils import Utils 
 from utils.sessions import SessionWorker
@@ -17,6 +18,7 @@ router = APIRouter(prefix=settings.api_prefix, tags=["Users"])
 SESSION_LENGTH = 60 * 60
 
 @router.post("/auth/provider/steam/login")
+@log_call("logs/trace.log")
 async def steam_login(token: str, response: Response,  
                       db_users: AsyncSession = Depends(get_user_session), 
                       db_sessions: AsyncSession = Depends(get_sessions_session)):
@@ -73,6 +75,7 @@ async def steam_login(token: str, response: Response,
     return payload
 
 @router.post("/me/logout")
+@log_call("logs/trace.log")
 async def logout(request: Request,
                  db_session: AsyncSession = Depends(get_sessions_session)):
     
@@ -83,6 +86,7 @@ async def logout(request: Request,
     await SessionManager.delete_session(db=db_session, bhvr_session=bhvr_session)
 
 @router.post("/me/richPresence")
+@log_call("logs/trace.log")
 async def rich_presence(request: Request,
                         db_users: AsyncSession = Depends(get_user_session),
                         db_sessions: AsyncSession = Depends(get_sessions_session)):

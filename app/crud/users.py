@@ -71,13 +71,14 @@ class UserManager:
         return result.scalar_one_or_none()
     
     @staticmethod
-    async def get_user_profile(db: AsyncSession, user_id: str) -> UserProfile | None:
+    async def get_user_profile(db: AsyncSession, user_id: str| None = None, steam_id: int | None = None) -> UserProfile | None:
         """
         Получает профиль пользователя по user_id.
 
         Args:
             db (AsyncSession): Асинхронная сессия SQLAlchemy.
-            user_id (str): Уникальный идентификатор пользователя.
+            user_id (str | None): Уникальный идентификатор пользователя.
+            steam_id (int | None): Стим айди пользователя.
 
         Returns:
             UserProfile | None: Объект профиля пользователя, если найден, иначе None.
@@ -90,7 +91,39 @@ class UserManager:
         else:
             print("Профиль не найден")
         """
-        stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+        if user_id:
+            stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+            result = await db.execute(stmt)
+            return result.scalar_one_or_none()
+        if steam_id:
+            stmt = select(UserProfile).where(UserProfile.steam_id == steam_id)
+            result = await db.execute(stmt)
+            return result.scalar_one_or_none()
+            
+        if not user_id and not steam_id:
+            raise ValueError("Необходимо передать хотя бы user_id или steam_id")
+        
+    @staticmethod
+    async def get_user_profile_by_name(db: AsyncSession, user_name: str) -> UserProfile | None:
+        """
+        Получает профиль пользователя по user_name.
+
+        Args:
+            db (AsyncSession): Асинхронная сессия SQLAlchemy.
+            user_id (str): Имя пользователя.
+
+        Returns:
+            UserProfile | None: Объект профиля пользователя, если найден, иначе None.
+
+        Пример использования:
+        ---------------------
+        profile = await UserManager.get_user_profile(db, user_id="abc123")
+        if profile:
+            print(profile.user_name, profile.xp)
+        else:
+            print("Профиль не найден")
+        """
+        stmt = select(UserProfile).where(UserProfile.user_name == user_name)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 

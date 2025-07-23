@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, BigInteger, JSON, func
+from sqlalchemy.ext.mutable import MutableList, MutableDict
 from sqlalchemy.orm import declarative_base
 
 from db.matchmaking import MatchsBase
@@ -12,6 +13,6 @@ class Party(MatchsBase):
     auto_join_key = Column(BigInteger)
     expiry_time = Column(BigInteger)
     player_count = Column(Integer, default=1)
-    game_specific_state = Column(JSON, default=dict)
-    members = Column(JSON, default=list)
+    game_specific_state = Column(MutableDict.as_mutable(JSON), default=dict)
+    members = Column(MutableList.as_mutable(JSON), default=list)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)

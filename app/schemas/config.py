@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     bonus_bloodpoints: int
     next_rank_reset_date: int
     redis_url: str
+    api_admin_prefix: str
+    ip_admin_list: list
 
     model_config = SettingsConfigDict(env_file="configs/.env", env_file_encoding="utf-8")
 

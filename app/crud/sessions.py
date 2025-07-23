@@ -41,7 +41,7 @@ class SessionManager:
         return session
 
     @staticmethod
-    async def delete_session(db: AsyncSession, bhvr_session: str) -> int:
+    async def delete_session(db: AsyncSession, bhvr_session: str = None, user_id: str = None) -> int | None:
         """
         Удаляет сессию по её bhvr_session.
 
@@ -52,10 +52,32 @@ class SessionManager:
         Returns:
             int: Количество удалённых строк.
         """
-        stmt = delete(Sessions).where(Sessions.bhvr_session == bhvr_session)
-        result = await db.execute(stmt)
-        await db.commit()
-        return result.rowcount
+        if bhvr_session:
+            exists_stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
+            res = await db.execute(exists_stmt)
+            session = res.scalars().first()
+            if not session:
+                return None
+
+            stmt = delete(Sessions).where(Sessions.bhvr_session == bhvr_session)
+            result = await db.execute(stmt)
+            await db.commit()
+            return result.rowcount
+        
+        elif user_id:
+            exists_stmt = select(Sessions).where(Sessions.user_id == user_id)
+            res = await db.execute(exists_stmt)
+            session = res.scalars().first()
+            if not session:
+                return None
+
+            stmt = delete(Sessions).where(Sessions.user_id == user_id)
+            result = await db.execute(stmt)
+            await db.commit()
+            return result.rowcount
+
+        else:
+            return False
 
     @staticmethod
     async def extend_session(db: AsyncSession, bhvr_session: str, extend_seconds: int) -> bool:
@@ -115,6 +137,23 @@ class SessionManager:
         result = await db.execute(stmt)
         session = result.scalar_one_or_none()
         return session.user_id if session else None
+    
+    @staticmethod
+    async def get_user_session_by_user_id(db: AsyncSession, user_id: str) -> Sessions | None:
+        """
+        Получает обьект session по user_id.
+
+        Args:
+            db (AsyncSession): Сессия БД.
+            bhvr_session (str): Идентификатор сессии.
+
+        Returns:
+            str | None: session или None если не найдено.
+        """
+        stmt = select(Sessions).where(Sessions.user_id == user_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        return session if session else None
 
     @staticmethod
     async def refresh_session_if_needed(db: AsyncSession, bhvr_session: str, threshold: int = 15 * 60, extend_seconds: int = 40 * 60) -> bool:

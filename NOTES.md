@@ -4,3 +4,5 @@
 СЕГОДНЯ: 1744299600 (11 июля 2025 00:00:00 МСК)
 
 ЗАВТРА: 1744386000 (12 июля 2025 00:00:00 МСК)
+
+git ls-files --exclude-standard -- ':!:**/*.test.ts.snap' ':!:**/*.test.ts' ':!:**/*.test.tsx' ':!:**/*.test.tsx.snap' ':!:.idea' ':!:**/*.eslintrc' ':!:package-lock.json' ':!:**/*.svg' ':!**/*.png' ':!**/*.jpg'  | xargs wc -l

@@ -3,6 +3,8 @@ from sqlalchemy import select, update, delete
 from typing import List, Optional
 from models.party import Party
 import datetime
+import logging
+from sqlalchemy.orm.attributes import flag_modified
 
 class PartyManager:
     @staticmethod
@@ -223,24 +225,98 @@ class PartyManager:
         player_id: str,
         state: dict
     ) -> Optional[Party]:
-        """
-        Обновить состояние (state) для участника в пати.
+        party = await PartyManager.get_party(db, party_id)
+        if not party:
+            return None
 
-        Args:
-            db: Асинхронная сессия SQLAlchemy.
-            party_id: ID пати.
-            player_id: ID игрока.
-            state: dict с обновлённым состоянием.
+        if not isinstance(party.members, list):
+            party.members = []
+
+        for m in party.members:
+            if m.get("playerId") == player_id:
+                m["state"] = {"body": state}
+                break
+        else:
+            party.members.append({"playerId": player_id, "state": state})
+            party.player_count = len(party.members)
+
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(party, "members")
+
+        await db.commit()
+        await db.refresh(party)
+        return party
+    
+    @staticmethod
+    async def add_player_to_join_order(
+        db: AsyncSession,
+        party_id: str,
+        player_id: str,
+    ) -> Optional[Party]:
+        """
+        Добавляет player_id в _playerJoinOrder внутри game_specific_state.
+        Дублирующиеся id не вставляются.
 
         Returns:
-            Party | None: пати с обновлённым members или None.
+            Party | None  – обновлённая запись или None, если пати не найдена.
+        """
+        party = await PartyManager.get_party(db, party_id)
+        if not party:
+            return None
+
+        gs: dict = party.game_specific_state or {}
+
+        join_order = gs.get("_playerJoinOrder")
+        if not isinstance(join_order, list):
+            join_order = []
+            gs["_playerJoinOrder"] = join_order
+
+        if player_id not in join_order:
+            join_order.append(player_id)
+
+            flag_modified(party, "game_specific_state")
+            await db.commit()
+            await db.refresh(party)
+
+        return party
+
+    @staticmethod
+    async def set_platform_session_id(
+        db: AsyncSession,
+        *,
+        party_id: str,
+        player_id: str,
+        platform_session_id: str,
+    ) -> Optional[Party]:
+        """
+        Установить новое значение _platformSessionId для участника.
+
+        Args:
+            db:           AsyncSession
+            party_id:     ID пати
+            player_id:    ID игрока (как в members[*].playerId)
+            platform_session_id: строка вида "1||7656119...|10977..."
+
+        Returns:
+            Party | None  – обновлённая пати либо None, если не найдена/нет участника.
         """
         party = await PartyManager.get_party(db, party_id)
         if not party or not isinstance(party.members, list):
             return None
+
+        updated = False
         for m in party.members:
             if m.get("playerId") == player_id:
-                m.update(state)
+                state = m.setdefault("state", {})
+                body  = state.setdefault("body", {})
+                body["_platformSessionId"] = platform_session_id
+                updated = True
+                break
+
+        if not updated:
+            return None
+
+        flag_modified(party, "members")
         await db.commit()
         await db.refresh(party)
         return party

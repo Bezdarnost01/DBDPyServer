@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 from pathlib import Path
+from utils.decorators import log_call
 
 router = APIRouter(tags=["CDN"])
 
 @router.get("/clientData/{key}/content/{version_game}/{json_file}")
+@log_call("logs/trace.log")
 async def cdn_content(key: str, version_game: str, json_file: str):
     if json_file == "emblemTunable.json":
         bin_path = Path("../assets/cdn/emblemTunable.bin").resolve()
@@ -33,6 +35,7 @@ async def cdn_content(key: str, version_game: str, json_file: str):
         return FileResponse(bin_path, media_type="application/octet-stream")
 
 @router.get("/clientData/{key}/content/{version_game}/{subfolder}/{json_file}")
+@log_call("logs/trace.log")
 async def cdn_content_subfolder(key: str, version_game: str, subfolder: str, json_file: str):
     if subfolder == "archiveRewardData":
         bin_path = Path("../assets/cdn/archiveRewardData.bin").resolve()
@@ -41,6 +44,7 @@ async def cdn_content_subfolder(key: str, version_game: str, subfolder: str, jso
         return FileResponse(bin_path, media_type="application/octet-stream")
 
 @router.get("/clientData/{key}/banners/{json_file}")
+@log_call("logs/trace.log")
 async def cdn_banners(key: str, json_file: str):
     if json_file == "featuredPageContent.json":
         bin_path = Path("../assets/cdn/featuredPageContent.bin").resolve()
@@ -49,6 +53,7 @@ async def cdn_banners(key: str, json_file: str):
         return FileResponse(bin_path, media_type="application/octet-stream")
 
 @router.get("/clientData/{key}/bonusPointEvents/{json_file}")
+@log_call("logs/trace.log")
 async def cdn_bonus_point_events(key: str, json_file: str):
     if json_file == "bonusPointEventsContent.json":
         bin_path = Path("../assets/cdn/bonusPointEventsContent.bin").resolve()
@@ -57,6 +62,7 @@ async def cdn_bonus_point_events(key: str, json_file: str):
         return FileResponse(bin_path, media_type="application/octet-stream")
 
 @router.get("/clientData/{key}/schedule/{json_file}")
+@log_call("logs/trace.log")
 async def cdn_schedule(key: str, json_file: str):
     if json_file == "contentSchedule.json":
         bin_path = Path("../assets/cdn/contentSchedule.bin").resolve()
@@ -65,6 +71,7 @@ async def cdn_schedule(key: str, json_file: str):
         return FileResponse(bin_path, media_type="application/octet-stream")
 
 @router.get("/clientData/{key}/news/{json_file}")
+@log_call("logs/trace.log")
 async def cdn_news(key: str, json_file: str):
     if json_file == "newsContent.json":
         bin_path = Path("../assets/cdn/newsContent.bin").resolve()

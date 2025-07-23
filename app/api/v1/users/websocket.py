@@ -7,29 +7,12 @@ from crud.sessions import SessionManager
 from crud.users import UserManager
 import uuid
 from utils.utils import Utils
+from crud.websocket import WSManager
 from utils.users import UserWorker
 
 router = APIRouter(tags=["RTM"])
 
-class WSConnectionManager:
-    def __init__(self):
-        self.active_connections: dict[str, WebSocket] = {}
-
-    async def connect(self, user_id: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
-
-    def disconnect(self, user_id: str):
-        self.active_connections.pop(user_id, None)
-
-    async def send_to_user(self, user_id: str, message: dict):
-        ws = self.active_connections.get(user_id)
-        if ws:
-            await ws.send_json(message)
-            return True
-        return False
-
-ws_manager = WSConnectionManager()
+ws_manager = WSManager()
 
 @router.get("/offtrack/api/realTimeMessaging/getUrl")
 async def get_rtm_url(request: Request,
@@ -58,7 +41,7 @@ async def websocket_rtm(websocket: WebSocket, path: str, db_sessions: AsyncSessi
         await websocket.close()
         return
 
-    await ws_manager.connect(user_id, websocket)
+    await ws_manager.connect(user_id, websocket=websocket, db=db_sessions)
     await ws_manager.send_to_user(user_id, {"topic": "connection", "event": "successful"})
     await ws_manager.send_to_user(user_id, {"topic": "initialization", "event": "Fully initialized"})
 
@@ -68,8 +51,5 @@ async def websocket_rtm(websocket: WebSocket, path: str, db_sessions: AsyncSessi
             # Можешь здесь обрабатывать входящие сообщения, например
             # await ws_manager.send_to_user(user_id, {"echo": data})
     except WebSocketDisconnect:
-        ws_manager.disconnect(user_id)
-        # Здесь можно сделать дополнительный cleanup в БД, если нужно
-
-# Пример использования из другого кода:
-# await ws_manager.send_to_user(user_id, {"topic": "your_topic", "event": "push!"})
+        await ws_manager.disconnect(user_id)
+        await SessionManager.delete_session(db_sessions, user_id=user_id)
