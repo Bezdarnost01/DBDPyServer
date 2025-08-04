@@ -133,11 +133,46 @@ class UserWorker:
         return UserWorker.encrypt_save_dbhvr(save_json)
 
     @staticmethod
+    async def set_user_save(db: AsyncSession, user_id: str, save_json: dict) -> bool:
+        """Установить сейв юзеру"""
+
+        from crud.users import UserManager
+
+        user = await UserManager.get_user(db, user_id=user_id)
+        if not user:
+            raise Exception("User not found")
+        
+        save_bin = UserWorker.encrypt_save_dbhvr(save_json)
+        if isinstance(save_bin, str):
+            save_bin = save_bin.encode('utf-8')
+
+        result = await UserManager.update_save_data(db=db, user_id=user_id, save_data=save_bin)
+
+        if result:
+            return True
+
+    @staticmethod
     def encrypted_to_json(save_encrypted: str) -> dict:
         """
         Превращает зашифрованный сейв DBD в словарь.
         """
         return json.loads(UserWorker.decrypt_save_dbhvr(save_encrypted))
+
+    @staticmethod
+    async def get_user_json_save(db: AsyncSession, user_id: str) -> dict:
+        """
+        Получить json сейв юзера
+        """
+        from crud.users import UserManager
+
+        user = await UserManager.get_user(db, user_id=user_id)
+        if not user:
+            raise Exception("User not found")
+        
+        save_dict = UserWorker.encrypted_to_json(user.save_data.decode("utf-8"))
+
+        return save_dict
+
     
     @staticmethod
     async def set_experience_in_save(db: AsyncSession, *, user_id: str = None, steam_id: int = None, new_experience: int):

@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import time
 import uvicorn
 import sys
 from fastapi import FastAPI
@@ -9,6 +10,7 @@ from api.v1 import routers
 from middleware.http_middleware import log_http_request_time
 from models import init_all_databases
 from schemas.config import settings
+from services.lobby import LobbyManager
 from crud.sessions import SessionManager
 from db.sessions import sessions_sessionmaker
 
@@ -32,10 +34,22 @@ async def regular_session_cleanup():
                 logging.error(f"Error during session cleanup: {e}")
         await asyncio.sleep(settings.cleanup_interval)
 
+async def cleanup_dead_lobbies(redis, lobby_manager, check_interval=20):
+    while True:
+        open_lobbies = await redis.smembers("lobbies:open")
+        now = int(time.time())
+        for match_id in open_lobbies:
+            ping = await redis.get(f"lobby_ping:{match_id}")
+            if ping is None:
+                await lobby_manager.delete_match(match_id)
+        await asyncio.sleep(check_interval)
+
 async def main(app: FastAPI):
     await init_all_databases()
     app.state.redis = redis.from_url(settings.redis_url, decode_responses=True)
+    app.state.lobby_manager = LobbyManager(app.state.redis)  # <-- Вот тут создаём и сохраняем!
     asyncio.create_task(regular_session_cleanup())
+    asyncio.create_task(cleanup_dead_lobbies(app.state.redis, app.state.lobby_manager))  # используем app.state.lobby_manager
     yield
     await app.state.redis.close()
 

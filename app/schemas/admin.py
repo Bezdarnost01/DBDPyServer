@@ -5,3 +5,6 @@ class KickUserRequest(BaseModel):
     user_id: str | None = None
     steam_id: int | None = None
     steam_name: str | None = None
+
+class SetUserSaveRequest(BaseModel):
+    save_json: dict

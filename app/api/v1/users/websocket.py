@@ -7,12 +7,11 @@ from crud.sessions import SessionManager
 from crud.users import UserManager
 import uuid
 from utils.utils import Utils
-from crud.websocket import WSManager
+from crud.websocket import ws_manager
 from utils.users import UserWorker
+import logging
 
 router = APIRouter(tags=["RTM"])
-
-ws_manager = WSManager()
 
 @router.get("/offtrack/api/realTimeMessaging/getUrl")
 async def get_rtm_url(request: Request,
@@ -23,6 +22,7 @@ async def get_rtm_url(request: Request,
         raise HTTPException(status_code=401, detail="No session cookie")
     
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
+    logging.info(user_id)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
     

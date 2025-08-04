@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import WebSocket
 from typing import Optional, List, Dict
 import pytz
+import logging
 
 MOSCOW = pytz.timezone("Europe/Moscow")
 
@@ -80,3 +81,6 @@ class WSManager:
         )
         await db.execute(q)
         await db.commit()
+
+
+ws_manager = WSManager()

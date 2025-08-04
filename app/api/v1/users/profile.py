@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=settings.api_prefix, tags=["Users"])
 
 @router.get("/inventories")
-@log_call("logs/trace.log")
 async def get_inventory(request: Request,
                         db_users: AsyncSession = Depends(get_user_session),
                         db_sessions: AsyncSession = Depends(get_sessions_session)
@@ -45,7 +44,6 @@ async def get_inventory(request: Request,
     }
 
 @router.get("/players/me/states/FullProfile/binary")
-@log_call("logs/trace.log")
 async def get_user_save(
     request: Request,
     db_users: AsyncSession = Depends(get_user_session),
@@ -133,7 +131,6 @@ async def get_localized_currencies_after_login(
     return {"list": result}
 
 @router.get("/wallet/currencies")
-@log_call("logs/trace.log")
 async def get_wallet_currencies(
     request: Request,
     db_users: AsyncSession = Depends(get_user_session),
@@ -200,7 +197,6 @@ async def get_player_name(
     }
 
 @router.post("/players/me/states/binary")
-@log_call("logs/trace.log")
 async def push_save_state(
     request: Request,
     version: str,
@@ -232,7 +228,11 @@ async def push_save_state(
 
 @router.post("/extensions/ownedProducts/reportOwnedProducts")
 async def report_owned_products(request: Request):
-    return Response(status_code=403)
+    return {
+        "entitlements": [],
+        "consumables": [],
+        "backfilledClientDlc": False
+    }
 
 @router.get("/ranks/pips")
 async def get_ranks_pips(
@@ -356,7 +356,6 @@ async def post_penalty_points():
     return {"penaltyPoints":0}
 
 @router.post("/players/friends/sync")
-@log_call("logs/trace.log")
 async def friends_sync(
     req: Request,
     db_users: AsyncSession = Depends(get_user_session),
