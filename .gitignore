@@ -2,3 +2,5 @@ venv
 app/data/*
 __pycache__/
 app/log/*
+app/logs/*
+data/*
