@@ -8,6 +8,8 @@ import json
 from Crypto.Cipher import AES
 from pathlib import Path
 from typing import Optional, List
+from typing import List, Dict
+from configs.config import XP_TABLE
 import logging
 logger = logging.getLogger(__name__) 
 
@@ -90,6 +92,132 @@ class Utils:
             "currentXpUpperBound": current_xp_upper_bound
         }
     
+    @staticmethod
+    def calc_match_xp(match_time: int, is_first_match: bool, consecutive_match: int, emblem_qualities: List[str]) -> Dict[str, int]:
+        """
+        Рассчитывает опыт, полученный за матч.
+
+        Аргументы:
+            match_time (int): время матча в секундах или минутах (зависит от твоей логики).
+            is_first_match (bool): является ли это первый матч игрока в сессии (даёт бонус).
+            consecutive_match (int): множитель за серию матчей (например: 1, 1.1, 1.2 ...).
+            emblem_qualities (List[str]): список эмблем игрока, возможные значения:
+                "None", "Bronze", "Silver", "Gold", "Iridescent".
+
+        Возвращает:
+            dict:
+                {
+                    "baseMatchXp": int,                # XP за время матча
+                    "emblemsBonus": int,               # XP за эмблемы
+                    "firstMatchBonus": int,            # XP за первый матч
+                    "consecutiveMatchMultiplier": int, # множитель серии матчей
+                    "totalXpGained": int               # итоговый XP за матч
+                }
+        """
+        time_xp = match_time * 10
+
+        emblem_values = {
+            "None": 0,
+            "Bronze": 100,
+            "Silver": 200,
+            "Gold": 400,
+            "Iridescent": 600
+        }
+        emblem_xp = sum(emblem_values.get(e, 0) for e in emblem_qualities)
+
+        first_match_bonus = 300 if is_first_match else 0
+
+        base_xp = time_xp + emblem_xp + first_match_bonus
+        gained_xp = int(base_xp * consecutive_match)
+
+        return {
+            "baseMatchXp": time_xp,
+            "emblemsBonus": emblem_xp,
+            "firstMatchBonus": first_match_bonus,
+            "consecutiveMatchMultiplier": consecutive_match,
+            "totalXpGained": gained_xp
+        }
+    
+    @staticmethod
+    def process_xp_gain(current_xp: int, current_level: int, current_prestige: int, gained_xp: int) -> Dict[str, int]:
+        """
+        Пересчитывает текущий опыт, уровень и престиж игрока с учётом полученного XP.
+
+        Аргументы:
+            current_xp (int): текущий XP игрока на его уровне.
+            current_level (int): текущий уровень игрока (1–99).
+            current_prestige (int): текущий престиж игрока.
+            gained_xp (int): XP, полученный за матч.
+            xp_table (dict): таблица {уровень: XP до следующего уровня}.
+
+        Возвращает:
+            dict:
+                {
+                    "currentXp": int,           # XP после пересчёта
+                    "currentXpUpperBound": int, # XP, требуемый до следующего уровня
+                    "level": int,               # новый уровень
+                    "prestigeLevel": int        # новый престиж
+                }
+        """
+        new_xp = current_xp + gained_xp
+        new_level = current_level
+        new_prestige = current_prestige
+
+        while True:
+            xp_needed = XP_TABLE.get(new_level + 1, 4200)
+            if new_xp >= xp_needed:
+                new_xp -= xp_needed
+                new_level += 1
+                if new_level > 99:
+                    new_prestige += 1
+                    new_level = 1
+                    new_xp = 0
+            else:
+                break
+
+        return {
+            "currentXp": new_xp,
+            "currentXpUpperBound": XP_TABLE.get(new_level + 1, 4200),
+            "level": new_level,
+            "prestigeLevel": new_prestige
+        }
+
+    @staticmethod
+    def calc_rewards(old_level: int, new_level: int, old_prestige: int, new_prestige: int) -> List[Dict[str, int]]:
+        """
+        Рассчитывает награды игроку за повышение уровня или престижа.
+
+        Аргументы:
+            old_level (int): уровень до матча.
+            new_level (int): уровень после матча.
+            old_prestige (int): престиж до матча.
+            new_prestige (int): престиж после матча.
+
+        Возвращает:
+            List[dict]: список наград в формате:
+                [
+                    {"currency": "Shards", "balance": 100},
+                    {"currency": "Cells", "balance": 50},
+                ]
+
+        Правила (можешь менять под себя):
+            - Каждый новый уровень → +100 Shards
+            - Каждый 10-й уровень → дополнительно +50 Cells
+            - Каждый новый престиж → +500 Cells и +2000 Shards
+        """
+        rewards = []
+
+        for lvl in range(old_level + 1, new_level + 1):
+            rewards.append({"currency": "Shards", "balance": 100})
+            if lvl % 10 == 0:
+                rewards.append({"currency": "Cells", "balance": 50})
+
+        if new_prestige > old_prestige:
+            rewards.append({"currency": "Cells", "balance": 500})
+            rewards.append({"currency": "Shards", "balance": 2000})
+
+        return rewards
+
     @staticmethod
     async def fetch_names_batch(steam_ids: List[str]) -> dict:
         async with httpx.AsyncClient() as client:

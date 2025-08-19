@@ -7,7 +7,6 @@ from db.users import get_user_session
 from db.sessions import get_sessions_session
 from db.matchmaking import get_matchmaking_session
 import random
-from crud.party import PartyManager
 import time
 import logging
 import json
@@ -80,6 +79,17 @@ def _find_player_party(user_id: str):
         if any(m.get("playerId") == user_id for m in p.get("members", [])):
             return p_id, p
     return None, None
+
+async def _broadcast_party_event(party: dict, payload: dict):
+    """Разослать payload всем участникам партии (и хосту)."""
+    targets = {m.get("playerId") for m in party.get("members", []) if m.get("playerId")}
+    host_id = party.get("hostPlayerId")
+    if host_id:
+        targets.add(host_id)
+    await asyncio.gather(
+        *(ws_manager.send_to_user(uid, payload) for uid in targets),
+        return_exceptions=True
+    )
 
 # ---------- PARTY endpoints ----------
 
@@ -278,14 +288,49 @@ async def leave_party(
 
 # ---------- PLAYER STATE endpoints ----------
 
-@router.get("/party/player/{player_id}/state")
-async def get_player_state(player_id: str):
+@router.put("/party/player/{player_id}/state")
+async def put_player_state(
+    player_id: str,
+    payload: Dict[str, Any],  # ожидаем {"body": {...}}
+    request: Request,
+    db_sessions: AsyncSession = Depends(get_sessions_session),
+):
     """
-    Возвращает {"body": {...}} для игрока, если сохранено.
-    Если нет — вернёт {"body": None} (или поменяй на 404 при желании).
+    Игрок обновляет только свой state. После апдейта шлём WS
+    всем участникам партии событие 'partyMemberStateChange'
+    с новым state.body.
     """
-    state = PLAYER_STATES.get(player_id)
-    return {"body": state}
+    user_id = await _get_current_user_id(request, db_sessions)
+    if user_id != player_id:
+        raise HTTPException(status_code=403, detail="You can update only your own state")
+
+    if not isinstance(payload, dict) or "body" not in payload or not isinstance(payload["body"], dict):
+        raise HTTPException(status_code=422, detail='Expected JSON: {"body": {...}}')
+
+    # сохранить состояние
+    PLAYER_STATES[player_id] = payload["body"]
+
+    # найти партию игрока
+    party_id, party = _find_player_party(player_id)
+    if party:
+        # сформировать WS-сообщение для всех участников
+        ws_msg = {
+            "topic": "userNotification",
+            "data": {
+                "partyId": party["partyId"],
+                "playerId": player_id,
+                "state": {"body": PLAYER_STATES[player_id]},
+                "timestamp": int(time.time() * 1000),
+            },
+            "event": "partyMemberStateChange",
+        }
+        await _broadcast_party_event(party, ws_msg)
+    else:
+        # игрок не состоит в партии — просто возвращаем обновлённый state
+        logger.debug(f"put_player_state: player {player_id} is not in a party; skip WS broadcast")
+
+    return {"body": PLAYER_STATES[player_id]}
+
 
 @router.put("/party/player/{player_id}/state")
 async def put_player_state(
@@ -570,7 +615,7 @@ async def join_party(
         "_playerRank": 1,
         "_characterLevel": 1,
         "_prestigeLevel": 0,
-        "_gameRole": 1,
+        "_gameRole": 1,  # 1 – выживший, 2 – убийца (пример)
         "_characterId": 6,
         "_powerId": "_EMPTY_",
         "_location": 1,
@@ -618,22 +663,91 @@ async def join_party(
     await ws_manager.send_to_user(party.get("hostPlayerId"), player_join_state)
     await ws_manager.send_to_user(user_id, party_state_change)
 
-    # HTTP-ответ (как раньше)
-    return {
-        "playerIsInParty": True,
-        "details": {
-            "partyId":      party["partyId"],
-            "autoJoinKey":  party.get("autoJoinKey"),
-            "hostPlayerId": party.get("hostPlayerId"),
-            "privacyState": party.get("privacyState", "public"),
-            "playerLimit":  party.get("playerLimit"),
-            "expiryTime":   party.get("expiryTime"),
-            "gameSpecificState": party.get("gameSpecificState", {}),
-            "members":      party.get("members", []),
-            "playerCount":  party.get("playerCount", len(party.get("members", []))),
-        }
+    # ----------- НИЖЕ: HTTP-ОТВЕТ В НУЖНОМ ФОРМАТЕ -----------
+    # соберём gameSpecificState c дефолтами
+    gsm = dict(party.get("gameSpecificState") or {})
+    gsm.setdefault("_customGamePresetData", {
+        "mapAvails": [],
+        "perkAvail": True,
+        "offeringAvail": True,
+        "itemAvail": True,
+        "itemAddonAvail": True,
+        "dlcContentAllowed": True,
+        "idleCrowsAllowed": True,
+        "privateMatch": True,
+        "bots": {"_bots": []},
+    })
+    gsm.setdefault("_partySessionSettings", {
+        "_sessionId": "",
+        "_gameSessionInfos": {},
+        "_owningUserId": "",
+        "_owningUserName": "",
+        "_isDedicated": False,
+        "_matchmakingTimestamp": -1,
+    })
+    # актуальный список id игроков
+    all_player_ids = [m.get("playerId") for m in party.get("members", []) if m.get("playerId")]
+    gsm.setdefault("_partyMatchmakingSettings", {
+        "_playerIds": all_player_ids,
+        "_matchmakingState": "None",
+        "_startMatchmakingDateTimestamp": -1,
+        "_matchIncentive": 0,
+        "_modeBonus": 0,
+        "_currentETASeconds": -1,
+        "_isInFinalCountdown": False,
+        "_postMatchmakingTransitionId": 0,
+        "_playWhileYouWaitLobbyState": "Inactive",
+        "_autoReadyEnabled": "None",
+        "_isPriorityQueue": False,
+        "_isPlayWhileYouWaitQueuePossible": False,
+    })
+    # порядок захода/индексы чата — уже заполняются _append_join_order_and_indices
+    gsm.setdefault("_playerJoinOrder", party.get("gameSpecificState", {}).get("_playerJoinOrder", []))
+    gsm.setdefault("_playerChatIndices", party.get("gameSpecificState", {}).get("_playerChatIndices", {}))
+
+    # вспомогательное — строковая роль для верхнего уровня
+    role_map = {1: "VE_Camper", 2: "VE_Slasher"}
+    top_level_player_role = role_map.get(int(player_role_int) if str(player_role_int).isdigit() else 1, "VE_Camper")
+
+    gsm.setdefault("_gameType", 0)
+    gsm.setdefault("_playerRole", top_level_player_role)
+    gsm.setdefault("_isCrowdPlay", False)
+    gsm.setdefault("_isUsingDedicatedServer", True)
+    gsm.setdefault("_chatHistory", {
+        "_chatMessageHistory": [
+            {"type": "SystemPlayerJoinedParty", "playerMirrorsId": str(user_id), "message": ""}
+        ],
+        "_chatPlayerRoles": []
+    })
+    gsm.setdefault("_version", "live")
+    now_ts = int(time.time())
+    gsm["_lastUpdatedTime"] = now_ts
+    gsm["_lastSentTime"] = now_ts
+
+    # члены с состояниями, если оно известно
+    members_with_state = []
+    for m in party.get("members", []):
+        pid = m.get("playerId")
+        entry = {"playerId": pid}
+        st = PLAYER_STATES.get(pid)
+        if isinstance(st, dict):
+            entry["state"] = {"body": st}
+        members_with_state.append(entry)
+
+    # итоговый ответ
+    response_payload = {
+        "partyId":      party["partyId"],
+        "playerLimit":  party.get("playerLimit"),
+        "privacyState": party.get("privacyState", "public"),
+        "gameSpecificState": gsm,
+        "autoJoinKey":  party.get("autoJoinKey"),
+        "hostPlayerId": party.get("hostPlayerId"),
+        "expiryTime":   party.get("expiryTime"),
+        "members":      members_with_state,
+        "playerCount":  party.get("playerCount", len(members_with_state)),
     }
 
+    return response_payload
 
 # PLATFORM_ID = None
 # PARTY_OWNER_STATE = None

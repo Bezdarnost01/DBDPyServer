@@ -13,7 +13,7 @@ class UserProfile(UsersBase):
     user_state = Column(String, default=None)
     xp = Column(Integer, default=0)
     rank = Column(Integer, default=0)
-    level = Column(Integer, default=0)
+    level = Column(Integer, default=1)
     pips = Column(Integer, default=0)
     killer_pips = Column(Integer, default=0)
     survivor_pips = Column(Integer, default=0)

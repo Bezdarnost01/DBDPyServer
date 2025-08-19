@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import MetaData, event
 
-MATCH_DATABASE_URL = "sqlite+aiosqlite:///../data/matchLists.db"
+MATCH_DATABASE_URL = "sqlite+aiosqlite:///../data/MatchBase.db"
 
 matchs_metadata = MetaData()
 

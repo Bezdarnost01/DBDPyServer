@@ -327,27 +327,17 @@ async def get_player_level(
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
-        return {
-            "code": 404,
-            "message": "Session not found",
-            "data": {}
-        }
+        raise HTTPException(status_code=401, detail="No session cookie")
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
-        return {
-            "code": 404,
-            "message": "Session not found",
-            "data": {}
-        }
+        raise HTTPException(status_code=401, detail="Session not found")
+    
     user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
-        return {
-            "code": 404,
-            "message": "User not found",
-            "data": {}
-        }
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
 
     profile_xp = getattr(user, "xp", 0) or 0
+
     level_object = Utils.xp_to_player_level(profile_xp)
     return level_object
 

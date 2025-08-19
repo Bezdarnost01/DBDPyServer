@@ -198,6 +198,75 @@ class UserManager:
         return user
 
     @staticmethod
+    async def ban(db: AsyncSession, *, user_id: str = None, steam_id: int = None) -> bool | None:
+        """
+        Блокировка пользователя.
+
+        Args:
+            db (AsyncSession): Сессия БД.
+            user_id (str, optional): user_id пользователя.
+            steam_id (int, optional): steam_id пользователя.
+
+        Returns:
+            bool | None: True/False — если пользователь найден, None — если нет такого пользователя.
+        """
+        if not user_id and not steam_id:
+            raise ValueError("Передайте хотя бы user_id или steam_id")
+        
+        stmt = select(DBUser)
+        if user_id:
+            stmt = stmt.where(DBUser.user_id == user_id)
+        elif steam_id:
+            stmt = stmt.where(DBUser.steam_id == steam_id)
+
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+
+        if not user:
+            return None
+
+        user.is_banned = True
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def unban(db: AsyncSession, *, user_id: str = None, steam_id: int = None) -> bool | None:
+        """
+        Разблокировка пользователя.
+
+        Args:
+            db (AsyncSession): Сессия БД.
+            user_id (str, optional): user_id пользователя.
+            steam_id (int, optional): steam_id пользователя.
+
+        Returns:
+            bool | None: True — если пользователь найден и разбанен,
+                        False — если уже не был забанен,
+                        None — если пользователь не найден.
+        """
+        if not user_id and not steam_id:
+            raise ValueError("Передайте хотя бы user_id или steam_id")
+        
+        stmt = select(DBUser)
+        if user_id:
+            stmt = stmt.where(DBUser.user_id == user_id)
+        elif steam_id:
+            stmt = stmt.where(DBUser.steam_id == steam_id)
+
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+
+        if not user:
+            return None
+
+        if not getattr(user, "is_banned", False):
+            return False
+
+        user.is_banned = False
+        await db.commit()
+        return True
+
+    @staticmethod
     async def is_banned(db: AsyncSession, *, user_id: str = None, steam_id: int = None) -> bool | None:
         """
         Проверка: является ли пользователь забаненным.
@@ -441,3 +510,31 @@ class UserManager:
         )
         result = await db.execute(stmt, {"steam_ids": steam_ids})
         return {str(row.steam_id): row.user_id for row in result.fetchall()}
+    
+    @staticmethod
+    async def update_player_progress(
+        db: AsyncSession,
+        user_id: int,
+        xp: int,
+        level: int,
+        prestige_level: int
+    ) -> None:
+        """
+        Обновляет прогресс игрока в базе:
+        XP, уровень, престиж.
+
+        :param db: сессия базы
+        :param user_id: ID игрока
+        :param xp: новый XP игрока
+        :param level: новый уровень игрока
+        :param prestige_level: новый престиж игрока
+        """
+        result = await db.execute(select(DBUser).where(DBUser.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            return
+
+        user.xp = xp
+        user.level = level
+        user.prestige_level = prestige_level
+        await db.commit()

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.config import settings
 from db.users import get_user_session
@@ -6,10 +6,13 @@ from db.sessions import get_sessions_session
 from crud.sessions import SessionManager
 from crud.users import UserManager
 import uuid
+import base64
 from utils.utils import Utils
 from crud.websocket import ws_manager
 from utils.users import UserWorker
 import logging
+import asyncio
+
 
 router = APIRouter(tags=["RTM"])
 
@@ -22,7 +25,6 @@ async def get_rtm_url(request: Request,
         raise HTTPException(status_code=401, detail="No session cookie")
     
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    logging.info(user_id)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
     
@@ -53,3 +55,115 @@ async def websocket_rtm(websocket: WebSocket, path: str, db_sessions: AsyncSessi
     except WebSocketDisconnect:
         await ws_manager.disconnect(user_id)
         await SessionManager.delete_session(db_sessions, user_id=user_id)
+
+# _active_clients: dict[WebSocket, str] = {}
+# _clients_lock = asyncio.Lock()
+
+# async def _broadcast(payload: dict, exclude: WebSocket | None = None):
+#     async with _clients_lock:
+#         targets = [ws for ws in _active_clients.keys() if ws is not exclude]
+#     tasks = [asyncio.create_task(ws.send_json(payload)) for ws in targets]
+#     if tasks:
+#         await asyncio.gather(*tasks, return_exceptions=True)
+
+# async def _broadcast_bytes(data: bytes, exclude: WebSocket | None = None):
+#     async with _clients_lock:
+#         targets = [ws for ws in _active_clients.keys() if ws is not exclude]
+#     tasks = [asyncio.create_task(ws.send_bytes(data)) for ws in targets]
+#     if tasks:
+#         await asyncio.gather(*tasks, return_exceptions=True)
+
+# @router.websocket("/ws/test")
+# async def websocket_test(websocket: WebSocket, name: str | None = Query(default=None)):
+#     user_name = name.strip() if name else f"user-{uuid.uuid4().hex[:6]}"
+#     await websocket.accept()
+
+#     async with _clients_lock:
+#         _active_clients[websocket] = user_name
+#         users_online = len(_active_clients)
+
+#     logging.info(f"[WS] Connected: {user_name} from {websocket.client}")
+
+#     await websocket.send_json({
+#         "type": "welcome",
+#         "message": "Test WebSocket connection established",
+#         "you": user_name,
+#         "online": users_online
+#     })
+#     await _broadcast({
+#         "type": "system",
+#         "message": f"{user_name} joined the chat",
+#         "online": users_online
+#     }, exclude=websocket)
+
+#     try:
+#         while True:
+#             try:
+#                 msg = await websocket.receive()
+#             except WebSocketDisconnect:
+#                 break  # выходим из цикла, не даём упасть в RuntimeError
+
+#             if msg["type"] == "websocket.disconnect":
+#                 break
+
+#             if msg.get("text") is not None:
+#                 text = msg["text"]
+#                 logging.info(f"[WS] {user_name} (text): {text}")
+
+#                 if text.strip().lower() == "ping":
+#                     await websocket.send_text("pong")
+#                     continue
+
+#                 await _broadcast({
+#                     "type": "message",
+#                     "from": user_name,
+#                     "text": text
+#                 }, exclude=websocket)
+
+#                 await websocket.send_json({
+#                     "type": "you",
+#                     "text": text
+#                 })
+
+#             elif msg.get("bytes") is not None:
+#                 data = msg["bytes"]
+#                 logging.info(f"[WS] {user_name} (binary): {len(data)} bytes")
+
+#                 await _broadcast({
+#                     "type": "system",
+#                     "message": f"{user_name} sent binary payload ({len(data)} bytes)"
+#                 })
+
+#                 await _broadcast_bytes(data, exclude=websocket)
+
+#                 await websocket.send_json({
+#                     "type": "you-binary",
+#                     "bytes": base64.b64encode(data).decode("utf-8")
+#                 })
+
+#     except WebSocketDisconnect:
+#         async with _clients_lock:
+#             _active_clients.pop(websocket, None)
+#             users_online = len(_active_clients)
+
+#         logging.info(f"[WS] Disconnected: {user_name} from {websocket.client}")
+#         print(f"[WS] Client disconnected: {user_name} {websocket.client}")
+#         await _broadcast({
+#             "type": "system",
+#             "message": f"{user_name} left the chat",
+#             "online": users_online
+#         })
+#     except Exception as e:
+#         logging.exception(f"[WS] Error for {user_name}: {e}")
+#         try:
+#             await websocket.close(code=1011)
+#         except RuntimeError:
+#             pass
+#         finally:
+#             async with _clients_lock:
+#                 _active_clients.pop(websocket, None)
+#             await _broadcast({
+#                 "type": "system",
+#                 "message": f"{user_name} disconnected (error)",
+#                 "online": len(_active_clients)
+#             })
