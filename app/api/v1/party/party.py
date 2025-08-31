@@ -26,6 +26,7 @@ router = APIRouter(prefix=settings.api_prefix, tags=["Party"])
 PARTIES: Dict[str, Dict[str, Any]] = {}        # party_id -> party
 PARTY_ID_BY_HOST: Dict[str, str] = {}          # hostPlayerId -> party_id
 PLAYER_STATES: Dict[str, Dict[str, Any]] = {}  # playerId -> state["body"]
+MATCHES: Dict[str, Dict[str, Any]] = {} 
 
 # --- deps you already имеешь ---
 # from deps import get_matchmaking_session, get_sessions_session
@@ -91,6 +92,90 @@ async def _broadcast_party_event(party: dict, payload: dict):
         return_exceptions=True
     )
 
+def _update_state_for_match(
+    player_id: str,
+    match_id: str,
+    role: str,                       # "Host" | "Client"
+    state: str = "InProgress",       # "InProgress" на create
+    make_ready: bool = True
+) -> dict:
+    """
+    Обновляет PLAYER_STATES[player_id] под матч и возвращает body.
+    Роль/статус задаются явно (Host/Client, InProgress/Completed/...).
+    """
+    st = PLAYER_STATES.get(player_id) or {}
+    st = st.copy() if isinstance(st, dict) else {}
+
+    # минимальные и косметические дефолты (как в примере)
+    st.setdefault("_isStateInitialized", True)
+    st.setdefault("_playerPlatform", "steam")
+    st.setdefault("_playerProvider", "steam")
+    st.setdefault("_uniquePlayerId", "")
+    st.setdefault("_playerName", str(player_id))
+    st.setdefault("_playerCustomization", {
+        "_equippedCustomization": {
+            "head": "C_Head01",
+            "torsoOrBody": "C_Torso01",
+            "legsOrWeapon": "C_Legs01"
+        },
+        "_equippedCharms": []
+    })
+    st.setdefault("_queueDelayIteration", 1)
+    st.setdefault("_characterClass", "_LOCKED_")
+    st.setdefault("_disconnectionPenaltyEndOfBan", 0)
+
+    # апдейты под матч
+    st["_matchId"] = match_id
+    st["_postMatchmakingRole"] = "Host" if role == "Host" else "Client"
+    st["_postMatchmakingState"] = state
+    if make_ready:
+        st["_ready"] = True
+
+    PLAYER_STATES[player_id] = st
+    return st
+
+async def _broadcast_member_state_change(party: dict, player_id: str, state_body: dict) -> None:
+    """
+    Рассылает всем участникам партии (и хосту) событие 'partyMemberStateChange'
+    о смене состояния указанного игрока.
+    """
+    ws_msg = {
+        "topic": "userNotification",
+        "data": {
+            "partyId": party["partyId"],
+            "playerId": player_id,
+            "state": {"body": state_body or {}},
+            "timestamp": int(time.time() * 1000),
+        },
+        "event": "partyMemberStateChange",
+    }
+    await _broadcast_party_event(party, ws_msg)
+
+async def _broadcast_party_state_snapshot(party: dict, exclude_host: bool = False):
+    """
+    Шлём 'partyStateChange' всем участникам (при желании без хоста),
+    собирая payload ТОЛЬКО из объекта party + кэша PLAYER_STATES.
+    """
+    # список адресатов
+    targets = [m.get("playerId") for m in party.get("members", []) if m.get("playerId")]
+    if exclude_host:
+        host_id = party.get("hostPlayerId")
+        targets = [t for t in targets if t != host_id]
+
+    for uid in targets:
+        st = PLAYER_STATES.get(uid) or {}
+        player_name = st.get("_playerName") or str(uid)
+        role_int = _safe_int(st.get("_gameRole", 1), 1)
+
+        # строим "чистый" partyStateChange по текущему состоянию party
+        evt = _build_party_state_change_event(
+            party=party,
+            joining_user_id=uid,       # для чат/ролей подставляем адресата
+            player_name=player_name,
+            player_role_int=role_int,
+        )
+        await ws_manager.send_to_user(uid, evt)
+
 # ---------- PARTY endpoints ----------
 
 @router.get("/party")
@@ -130,19 +215,58 @@ async def get_party(
 
     return parties
 
-
 @router.get("/party/{party_id}")
 async def get_party_by_id(
     party_id: str,
     includeMemberStates: bool = Query(False),
+    request: Request = None,
+    db_sessions: AsyncSession = Depends(get_sessions_session),
 ):
     party = _find_party_by_id(party_id)
     if not party:
         raise HTTPException(status_code=404, detail="Party not found")
 
+    # Пытаемся определить текущего пользователя — чтобы отправить ему WS
+    user_id = None
+    try:
+        if request is not None:
+            user_id = await _get_current_user_id(request, db_sessions)
+    except HTTPException:
+        user_id = None
+
+    if user_id:
+        # Имя/роль берём из кэшированного STATE (если нет — дефолты)
+        st = PLAYER_STATES.get(user_id) or {}
+        player_name = st.get("_playerName") or "---"
+        role_int = _safe_int(st.get("_gameRole", 1), 1)
+
+        # Готовим event "partyStateChange" на основе текущей party
+        evt = _build_party_state_change_event(
+            party=party,
+            joining_user_id=user_id,
+            player_name=player_name,
+            player_role_int=role_int,
+        )
+
+        # Патчим под требования примера:
+        # 1) dedicated = true
+        evt["data"]["state"]["gameSpecificState"]["_isUsingDedicatedServer"] = True
+        # 2) актуальный список игроков в _partyMatchmakingSettings._playerIds
+        evt["data"]["state"]["gameSpecificState"]["_partyMatchmakingSettings"]["_playerIds"] = [
+            m.get("playerId") for m in party.get("members", []) if m.get("playerId")
+        ]
+        # 3) при желании можно форснуть _gameType=1 (как в примере)
+        if "_gameType" not in evt["data"]["state"]["gameSpecificState"]:
+            evt["data"]["state"]["gameSpecificState"]["_gameType"] = 1
+
+        # Шлём только текущему игроку
+        await ws_manager.send_to_user(user_id, evt)
+
+    # HTTP-ответ — как раньше
     if not includeMemberStates:
         return party
 
+    logger.debug(user_id)
     p_copy = copy.deepcopy(party)
     member_states = {
         m["playerId"]: {"body": PLAYER_STATES.get(m["playerId"])}
@@ -151,7 +275,6 @@ async def get_party_by_id(
     }
     p_copy["memberStates"] = member_states
     return p_copy
-
 
 @router.post("/party")
 async def create_party(
@@ -329,29 +452,6 @@ async def put_player_state(
         # игрок не состоит в партии — просто возвращаем обновлённый state
         logger.debug(f"put_player_state: player {player_id} is not in a party; skip WS broadcast")
 
-    return {"body": PLAYER_STATES[player_id]}
-
-
-@router.put("/party/player/{player_id}/state")
-async def put_player_state(
-    player_id: str,
-    payload: Dict[str, Any],  # ожидаем {"body": {...}}
-    request: Request,
-    db_sessions: AsyncSession = Depends(get_sessions_session),
-):
-    """
-    Игрок может обновлять только свой собственный state.
-    Хост/другие игроки — 403. Если нужно разрешить хосту — убери проверку ниже.
-    """
-    user_id = await _get_current_user_id(request, db_sessions)
-    if user_id != player_id:
-        raise HTTPException(status_code=403, detail="You can update only your own state")
-
-    if not isinstance(payload, dict) or "body" not in payload or not isinstance(payload["body"], dict):
-        raise HTTPException(status_code=422, detail="Expected JSON: {\"body\": {...}}")
-
-    # (опционально) провалидировать ключи body — пропускаем как есть
-    PLAYER_STATES[player_id] = payload["body"]
     return {"body": PLAYER_STATES[player_id]}
 
 @router.delete("/party/{party_id}")
@@ -576,6 +676,9 @@ async def join_party(
     # сохранить партию
     PARTIES[party["partyId"]] = party
 
+    # хост ли текущий юзер
+    is_host = (party.get("hostPlayerId") == user_id)
+
     # профиль игрока (имя/steam_id)
     player_profile = await UserManager.get_user_profile(db_users, user_id)
     player_name = getattr(player_profile, "user_name", str(user_id))
@@ -615,7 +718,7 @@ async def join_party(
         "_playerRank": 1,
         "_characterLevel": 1,
         "_prestigeLevel": 0,
-        "_gameRole": 1,  # 1 – выживший, 2 – убийца (пример)
+        "_gameRole": 1,  # 1 – выживший, 2 – убийца
         "_characterId": 6,
         "_powerId": "_EMPTY_",
         "_location": 1,
@@ -625,8 +728,8 @@ async def join_party(
         "_playerPlatform": "steam",
         "_playerProvider": "steam",
         "_matchId": "",
-        "_postMatchmakingRole": "None",
-        "_postMatchmakingState": "None",
+        "_postMatchmakingRole": "None",   # перезапишем ниже
+        "_postMatchmakingState": "None",  # перезапишем ниже
         "_roleRequested": 0,
         "_anonymousSuffix": 0,
         "_isStateInitialized": True,
@@ -635,6 +738,11 @@ async def join_party(
     }
     for k, v in state_defaults.items():
         state_body.setdefault(k, v)
+
+    # перезапишем роль/состояние явно
+    state_body["_postMatchmakingRole"] = "Host" if is_host else "Client"
+    state_body["_postMatchmakingState"] = "Completed"
+
     state_body["_platformSessionId"] = platform_session
     PLAYER_STATES[user_id] = state_body  # кэш
 
@@ -663,8 +771,7 @@ async def join_party(
     await ws_manager.send_to_user(party.get("hostPlayerId"), player_join_state)
     await ws_manager.send_to_user(user_id, party_state_change)
 
-    # ----------- НИЖЕ: HTTP-ОТВЕТ В НУЖНОМ ФОРМАТЕ -----------
-    # соберём gameSpecificState c дефолтами
+    # ----------- HTTP-ОТВЕТ -----------
     gsm = dict(party.get("gameSpecificState") or {})
     gsm.setdefault("_customGamePresetData", {
         "mapAvails": [],
@@ -685,7 +792,6 @@ async def join_party(
         "_isDedicated": False,
         "_matchmakingTimestamp": -1,
     })
-    # актуальный список id игроков
     all_player_ids = [m.get("playerId") for m in party.get("members", []) if m.get("playerId")]
     gsm.setdefault("_partyMatchmakingSettings", {
         "_playerIds": all_player_ids,
@@ -701,18 +807,16 @@ async def join_party(
         "_isPriorityQueue": False,
         "_isPlayWhileYouWaitQueuePossible": False,
     })
-    # порядок захода/индексы чата — уже заполняются _append_join_order_and_indices
     gsm.setdefault("_playerJoinOrder", party.get("gameSpecificState", {}).get("_playerJoinOrder", []))
     gsm.setdefault("_playerChatIndices", party.get("gameSpecificState", {}).get("_playerChatIndices", {}))
 
-    # вспомогательное — строковая роль для верхнего уровня
     role_map = {1: "VE_Camper", 2: "VE_Slasher"}
     top_level_player_role = role_map.get(int(player_role_int) if str(player_role_int).isdigit() else 1, "VE_Camper")
 
     gsm.setdefault("_gameType", 0)
     gsm.setdefault("_playerRole", top_level_player_role)
     gsm.setdefault("_isCrowdPlay", False)
-    gsm.setdefault("_isUsingDedicatedServer", True)
+    gsm.setdefault("_isUsingDedicatedServer", False)
     gsm.setdefault("_chatHistory", {
         "_chatMessageHistory": [
             {"type": "SystemPlayerJoinedParty", "playerMirrorsId": str(user_id), "message": ""}
@@ -724,7 +828,6 @@ async def join_party(
     gsm["_lastUpdatedTime"] = now_ts
     gsm["_lastSentTime"] = now_ts
 
-    # члены с состояниями, если оно известно
     members_with_state = []
     for m in party.get("members", []):
         pid = m.get("playerId")
@@ -734,7 +837,6 @@ async def join_party(
             entry["state"] = {"body": st}
         members_with_state.append(entry)
 
-    # итоговый ответ
     response_payload = {
         "partyId":      party["partyId"],
         "playerLimit":  party.get("playerLimit"),
@@ -748,6 +850,205 @@ async def join_party(
     }
 
     return response_payload
+
+DEFAULT_MAP_AVAILS = [255, 255, 239, 255, 255, 255, 255, 3, 0, 0, 0]
+
+def _norm_map_avails(src) -> list[int]:
+    """Вернёт массив из 11 значений как в целевой схеме."""
+    if isinstance(src, list) and len(src) == 11 and all(isinstance(x, int) for x in src):
+        return src
+    # попытка извлечь из сырого payload (некоторые клиенты присылают строки чисел)
+    try:
+        if isinstance(src, list):
+            src_int = [int(x) for x in src]
+            if len(src_int) == 11:
+                return src_int
+    except Exception:
+        pass
+    return DEFAULT_MAP_AVAILS
+
+# @router.post("/match/create", operation_id="match_create_v1", name="match_create_v1")
+# async def create_match(
+#     data: dict,
+#     request: Request,
+#     db_sessions: AsyncSession = Depends(get_sessions_session),
+# ):
+#     host_id = await _get_current_user_id(request, db_sessions)
+#     match_id = host_id
+#     now_ms = int(time.time() * 1000)
+
+#     # 1) собираем sideB: приоритет sideB -> playersB -> пати хоста
+#     sideB = list(data.get("sideB") or [])
+#     if not sideB:
+#         playersB = list(data.get("playersB") or [])
+#         if playersB:
+#             sideB = playersB
+#     if not sideB:
+#         _, party = _find_player_party(host_id)
+#         if party:
+#             sideB = [
+#                 m.get("playerId")
+#                 for m in party.get("members", [])
+#                 if m.get("playerId") and m.get("playerId") != host_id
+#             ]
+
+#     # 2) считаем количества и категорию
+#     countA = 1
+#     countB = len(sideB)
+#     category_out = f"live-277399-:::all::{countA}:{countB}:G:2:P"
+
+#     # 3) формируем HTTP-ответ (как у тебя, но с динамикой и host_id)
+#     response = {
+#         "matchId": match_id,                     # <-- host_id
+#         "schema": 3,
+#         "category": category_out,
+#         "geolocation": {},
+#         "creationDateTime": now_ms,
+#         "status": "OPENED",
+#         "creator": host_id,                      # <-- host_id
+#         "customData": {},
+#         "version": 1,
+#         "effectiveCounts": {"A": countA, "B": countB},
+#         "churn": 0,
+#         "props": {
+#             "EncryptionKey": "GdvU19quZQRRu8yKHA8NxZ/umxDMkhwgGC695JpoZv8=",
+#             "MatchConfiguration": "{\r\n\t\"_mapAvailabilities\": [ 255, 255, 255, 255, 255 ],\r\n\t\"_arePerkAvailable\": true,\r\n\t\"_areOfferingAvailable\": true,\r\n\t\"_areItemAvailable\": true,\r\n\t\"_areItemAddonAvailable\": true,\r\n\t\"_areDlcContentAllowed\": true,\r\n\t\"_isPrivateMatch\": true\r\n}",
+#             "GameType": "1",
+#             "isPrivate": True,
+#             "countA": countA,
+#             "countB": countB,                    # <-- динамика
+#             "platform": "UniversalXPlay",
+#             "isDedicated": False                 # как у тебя в create
+#         },
+#         "reason": "",
+#         "region": "all",
+#         "sideA": [host_id],                      # <-- host_id
+#         "sideB": sideB,                          # <-- динамика
+#         "isRequesterCreator": False
+#     }
+
+#     # 4) сохраняем матч
+#     MATCHES[match_id] = response
+
+#     # 5) WS: уведомляем соответствующие пати (хоста + всех из sideB)
+#     targets = set(sideB)
+#     targets.add(host_id)
+
+#     touched_party_ids = set()
+#     for pid in targets:
+#         p_id, p_obj = _find_player_party(pid)
+#         if p_obj:
+#             touched_party_ids.add(p_id)
+
+#     for p_id in touched_party_ids:
+#         party = PARTIES[p_id]
+#         party_host = party.get("hostPlayerId")
+
+#         for m in party.get("members", []):
+#             pid = m.get("playerId")
+#             if not pid:
+#                 continue
+#             role = "Host" if pid == party_host else "Client"
+#             new_body = _update_state_for_match(
+#                 player_id=pid,
+#                 match_id=match_id,               # matchId = host_id
+#                 role=role,
+#                 state="InProgress",
+#                 make_ready=True
+#             )
+#             await _broadcast_member_state_change(party, pid, new_body)
+
+#     return response
+
+# @router.get("/match/{match_id}", operation_id="match_get_v1", name="match_get_v1")
+# async def get_match(match_id: str):
+#     match = MATCHES.get(match_id)
+#     if not match:
+#         raise HTTPException(status_code=404, detail="Match not found")
+#     return match
+
+# @router.post("/match/{match_id}/register", operation_id="match_register_v1", name="match_register_v1")
+# async def register_match(
+#     match_id: str,
+#     data: dict,
+#     request: Request,
+#     db_sessions: AsyncSession = Depends(get_sessions_session),
+# ):
+#     """
+#     Хост регистрирует матч.
+#     Вход: {"customData":{"SessionSettings":"<BASE64>"} , (опционально) "sideB": ["playerId1", ...]}
+#     sideB:
+#       - если передан в запросе — используем как есть;
+#       - иначе берём из пати хоста (все члены, кроме хоста).
+#     sideA фиксирован: [match_id]
+#     """
+
+#     # 1) SessionSettings (как в твоём примере)
+#     DEFAULT_SESSION_SETTINGS = (
+#         "AAAAJGZkYzJiYTk4LTQ0NjEtNDJjMC04ODdkLTIxNmUzNzM0YjkwMgAAAAAAAAAAAAAAAAAAAAYAAAAAAQAAAAEBAQABAAAEO5cAAAARAAAAB01BUE5BTUUGAAAAC09ubGluZUxvYmJ5AgAAABBDVVNUT01TRUFSQ0hJTlQyAescCN8CAAAACEdBTUVNT0RFBgAAAAROb25lAgAAABBDVVNUT01TRUFSQ0hJTlQ1AQAAAAECAAAADE1BVENIVElNRU9VVAdC8AAAAgAAABNTRVNTSU9OVEVNUExBVEVOQU1FBgAAAAtHYW1lU2Vzc2lvbgIAAAAOU0VBUkNIS0VZV09SRFMGAAAABkN1c3RvbQIAAAAQQ1VTVE9NU0VBUkNISU5UMwEAAAABAgAAABBTZXNzaW9uU3RhcnRUaW1lBgAAABgyMDI1LTA4LTIwVDIwOjQ0OjM0LjUzMloCAAAAEENVU1RPTVNFQVJDSElOVDEBAAAAEQMAAAAQTWlycm9yc1Nlc3Npb25JZAYAAAAkZmRjMmJhOTgtNDQ2MS00MmMwLTg4N2QtMjE2ZTM3MzRiOTAyAgAAAA1FbmNyeXB0aW9uS2V5BgAAACxHZHZVMTlxdVpRUlJ1OHlLSEE4TnhaL3VteERNa2h3Z0dDNjk1SnBvWnY4PQIAAAASTWF0Y2hDb25maWd1cmF0aW9uBgAAAPF7DQoJIl9tYXBBdmFpbGFiaWxpdGllcyI6IFsgMjU1LCAyNTUsIDI1NSwgMjU1LCAyNTUgXSwNCgkiX2FyZVBlcmtBdmFpbGFibGUiOiB0cnVlLA0KCSJfYXJlT2ZmZXJpbmdBdmFpbGFibGUiOiB0cnVlLA0KCSJfYXJlSXRlbUF2YWlsYWJsZSI6IHRydWUsDQoJIl9hcmVJdGVtQWRkb25BdmFpbGFibGUiOiB0cnVlLA0KCSJfYXJlRGxjQ29udGVudEFsbG93ZWQiOiB0cnVlLA0KCSJfaXNQcml2YXRlTWF0Y2giOiB0cnVlDQp9AgAAAAZDb3VudEEBAAAAAQIAAAAGQ291bnRCAQAAAAACAAAACHBsYXRmb3JtBgAAAA5Vbml2ZXJzYWxYUGxheQIAAAARUGxhdGZvcm1TZXNzaW9uSWQGAAAALDF8fDc2NTYxMTk5ODI2MDA5NDA5Ojc3Nzd8MTA5Nzc1MjQxMzk4MDEyNjQ5Ag=="
+#     )
+#     req_custom = data.get("customData") or {}
+#     session_settings = req_custom.get("SessionSettings") or DEFAULT_SESSION_SETTINGS
+
+#     # 2) Определяем host и sideB
+#     sideB = list(data.get("sideB") or [])
+
+#     try:
+#         host_id = await _get_current_user_id(request, db_sessions)
+#     except HTTPException:
+#         host_id = None
+
+#     if not sideB and host_id:
+#         # найдём пати хоста и соберём sideB из участников пати (кроме хоста)
+#         _, party = _find_player_party(host_id)
+#         if party:
+#             sideB = [
+#                 m.get("playerId")
+#                 for m in party.get("members", [])
+#                 if m.get("playerId") and m.get("playerId") != host_id
+#             ]
+
+#     # 3) Считаем количества и формируем динамические поля
+#     countA = 1  # как ты писал — A фиксирован (хост/идентификатор матча)
+#     countB = len(sideB)
+#     category_out = f"live-277399-:::all::{countA}:{countB}:G:2:P"
+#     now_ms = int(time.time() * 1000)
+
+#     # 4) Собираем ответ по нужной схеме
+#     response = {
+#         "matchId": match_id,
+#         "schema": 3,
+#         "category": category_out,
+#         "geolocation": {},
+#         "creationDateTime": now_ms,
+#         "status": "CREATED",
+#         "creator": "",
+#         "customData": {"SessionSettings": session_settings},
+#         "version": 1,
+#         "effectiveCounts": {"A": countA, "B": countB},
+#         "churn": 0,
+#         "props": {
+#             "EncryptionKey": "ljyd1L2rRx9SWqJPM0WB2WtEAg5WPzdyCiihNx/6r98=",
+#             "MatchConfig": "{\"mapAvails\":[255,255,239,255,255,255,255,3,0,0,0],\"perkAvail\":true,\"offeringAvail\":true,\"itemAvail\":true,\"itemAddonAvail\":true,\"dlcContentAllowed\":true,\"idleCrowsAllowed\":true,\"privateMatch\":true,\"bots\":{\"_bots\":[]}}",
+#             "CrossplayOptOut": "false",
+#             "GameType": "None:1",
+#             "isPrivate": True,
+#             "countA": countA,
+#             "countB": countB,
+#             "platform": "UniversalXPlay",
+#             "isDedicated": True,
+#         },
+#         "reason": "",
+#         "region": "all",
+#         "sideA": [match_id],   # A остаётся фиксированным
+#         "sideB": sideB,        # B динамический
+#         "isRequesterInMatch": True,
+#         "isRequesterCreator": False,
+#     }
+
+#     # 5) Сохраняем
+#     MATCHES[match_id] = response
+#     return response
 
 # PLATFORM_ID = None
 # PARTY_OWNER_STATE = None

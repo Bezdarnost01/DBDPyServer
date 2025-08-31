@@ -5,6 +5,7 @@ import base64
 import zlib
 import struct
 import json
+import asyncio
 from Crypto.Cipher import AES
 from pathlib import Path
 from typing import Optional, List
@@ -219,16 +220,84 @@ class Utils:
         return rewards
 
     @staticmethod
-    async def fetch_names_batch(steam_ids: List[str]) -> dict:
-        async with httpx.AsyncClient() as client:
-            ids_str = ','.join(steam_ids)
-            params = {
-                'key': STEAM_API_KEY,
-                'steamids': ids_str
-            }
-            resp = await client.get(STEAM_API_URL, params=params)
-            data = resp.json()
-            return {p['steamid']: p['personaname'] for p in data['response']['players']}
+    async def fetch_names_batch(
+        steam_ids: List[str],
+        *,
+        api_key: Optional[str] = None,
+        timeout: float = 10.0,
+        max_retries: int = 3,
+        base_backoff: float = 1.0,
+        concurrency: int = 3,
+    ) -> Dict[str, str]:
+        api_key = STEAM_API_KEY
+        if not steam_ids:
+            return {}
+
+        chunks: List[List[str]] = [steam_ids[i:i+100] for i in range(0, len(steam_ids), 100)]
+        results: Dict[str, str] = {}
+        sem = asyncio.Semaphore(max(1, concurrency))
+
+        async def fetch_chunk(client: httpx.AsyncClient, chunk: List[str]) -> Dict[str, str]:
+            nonlocal api_key
+            params = {"key": api_key, "steamids": ",".join(chunk)}
+
+            attempt = 0
+            while True:
+                attempt += 1
+                try:
+                    async with sem:
+                        resp = await client.get(STEAM_API_URL, params=params)
+                except httpx.RequestError as e:
+                    logger.warning(f"[Steam] сетевой сбой (попытка {attempt}/{max_retries}): {e}")
+                    # Повторяем только если есть попытки
+                    if attempt <= max_retries:
+                        await asyncio.sleep(base_backoff * (2 ** (attempt - 1)) + random.random())
+                        continue
+                    return {}
+
+                # Обработка статусов
+                if resp.status_code == 200:
+                    ctype = resp.headers.get("Content-Type", "").lower()
+                    text_preview = resp.text[:200] if resp.text else ""
+                    if "application/json" not in ctype:
+                        logger.error(f"[Steam] неожиданный Content-Type='{ctype}'. Превью: {text_preview!r}")
+                        return {}
+                    try:
+                        data = resp.json()
+                        players = data.get("response", {}).get("players", [])
+                        return {p.get("steamid", ""): p.get("personaname", "") for p in players if p.get("steamid")}
+                    except ValueError:
+                        logger.error(f"[Steam] не удалось распарсить JSON. Превью: {text_preview!r}")
+                        return {}
+                elif resp.status_code in (429, 500, 502, 503, 504):
+                    # Рейт-лимит / временные ошибки — повторяем
+                    retry_after_hdr = resp.headers.get("Retry-After")
+                    if retry_after_hdr and retry_after_hdr.isdigit():
+                        delay = float(retry_after_hdr)
+                    else:
+                        delay = base_backoff * (2 ** (attempt - 1)) + random.random()
+                    logger.warning(f"[Steam] статус {resp.status_code}, повтор через {delay:.2f}s "
+                                   f"(попытка {attempt}/{max_retries}). Тело: {resp.text[:200]!r}")
+                    if attempt <= max_retries:
+                        await asyncio.sleep(delay)
+                        continue
+                    return {}
+                else:
+                    # Прочие ошибки — лог и без повторов
+                    logger.error(f"[Steam] ошибка {resp.status_code}: {resp.text[:200]!r}")
+                    return {}
+
+        async with httpx.AsyncClient(http2=True, timeout=timeout) as client:
+            chunk_tasks = [asyncio.create_task(fetch_chunk(client, ch)) for ch in chunks]
+            for t in asyncio.as_completed(chunk_tasks):
+                try:
+                    partial = await t
+                except Exception as e:
+                    logger.exception(f"[Steam] необработанное исключение при запросе чанка: {e}")
+                    partial = {}
+                results.update(partial)
+
+        return results
         
     @staticmethod
     async def get_item_price(character_name: str = None, outfit_id: str = None, item_id: str = None, currency_id: str = None, redis=None):

@@ -32,7 +32,7 @@ async def steam_login(token: str, response: Response,
     await UserManager.update_last_login(db_users, steam_id=steam_id)
 
     if user.is_banned:
-        raise HTTPException(status_code=401, detail="Your banned")
+        raise HTTPException(status_code=401, detail="You`re banned")
 
     cloud_id = user.user_id
     now = int(time.time())
