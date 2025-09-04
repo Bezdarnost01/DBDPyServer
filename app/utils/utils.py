@@ -10,7 +10,8 @@ from Crypto.Cipher import AES
 from pathlib import Path
 from typing import Optional, List
 from typing import List, Dict
-from configs.config import XP_TABLE
+import random
+from configs.config import EMBLEM_XP, XP_PER_UNIT, CAP, FIRST_MATCH_BONUS, XP_TABLE
 import logging
 logger = logging.getLogger(__name__) 
 
@@ -78,109 +79,116 @@ class Utils:
             return None
     
     @staticmethod
-    def xp_to_player_level(xp: int):
+    def xp_to_player_level(total_xp: int) -> Dict[str, int]:
+        """
+        Преобразует общий накопленный XP в состояние уровня/престижа, используя XP_TABLE.
+        """
         level_version = 34
-        prestige_level = 0
-        level = min(xp // 2100 + 1, 100)
-        current_xp = xp % 2100
-        current_xp_upper_bound = 2100
-        return {
-            "totalXp": xp,
-            "levelVersion": level_version,
-            "level": level,
-            "prestigeLevel": prestige_level,
-            "currentXp": current_xp,
-            "currentXpUpperBound": current_xp_upper_bound
-        }
-    
-    @staticmethod
-    def calc_match_xp(match_time: int, is_first_match: bool, consecutive_match: int, emblem_qualities: List[str]) -> Dict[str, int]:
-        """
-        Рассчитывает опыт, полученный за матч.
-
-        Аргументы:
-            match_time (int): время матча в секундах или минутах (зависит от твоей логики).
-            is_first_match (bool): является ли это первый матч игрока в сессии (даёт бонус).
-            consecutive_match (int): множитель за серию матчей (например: 1, 1.1, 1.2 ...).
-            emblem_qualities (List[str]): список эмблем игрока, возможные значения:
-                "None", "Bronze", "Silver", "Gold", "Iridescent".
-
-        Возвращает:
-            dict:
-                {
-                    "baseMatchXp": int,                # XP за время матча
-                    "emblemsBonus": int,               # XP за эмблемы
-                    "firstMatchBonus": int,            # XP за первый матч
-                    "consecutiveMatchMultiplier": int, # множитель серии матчей
-                    "totalXpGained": int               # итоговый XP за матч
-                }
-        """
-        time_xp = match_time * 10
-
-        emblem_values = {
-            "None": 0,
-            "Bronze": 100,
-            "Silver": 200,
-            "Gold": 400,
-            "Iridescent": 600
-        }
-        emblem_xp = sum(emblem_values.get(e, 0) for e in emblem_qualities)
-
-        first_match_bonus = 300 if is_first_match else 0
-
-        base_xp = time_xp + emblem_xp + first_match_bonus
-        gained_xp = int(base_xp * consecutive_match)
-
-        return {
-            "baseMatchXp": time_xp,
-            "emblemsBonus": emblem_xp,
-            "firstMatchBonus": first_match_bonus,
-            "consecutiveMatchMultiplier": consecutive_match,
-            "totalXpGained": gained_xp
-        }
-    
-    @staticmethod
-    def process_xp_gain(current_xp: int, current_level: int, current_prestige: int, gained_xp: int) -> Dict[str, int]:
-        """
-        Пересчитывает текущий опыт, уровень и престиж игрока с учётом полученного XP.
-
-        Аргументы:
-            current_xp (int): текущий XP игрока на его уровне.
-            current_level (int): текущий уровень игрока (1–99).
-            current_prestige (int): текущий престиж игрока.
-            gained_xp (int): XP, полученный за матч.
-            xp_table (dict): таблица {уровень: XP до следующего уровня}.
-
-        Возвращает:
-            dict:
-                {
-                    "currentXp": int,           # XP после пересчёта
-                    "currentXpUpperBound": int, # XP, требуемый до следующего уровня
-                    "level": int,               # новый уровень
-                    "prestigeLevel": int        # новый престиж
-                }
-        """
-        new_xp = current_xp + gained_xp
-        new_level = current_level
-        new_prestige = current_prestige
+        prestige = 0
+        level = 1
+        cur_xp = total_xp
 
         while True:
-            xp_needed = XP_TABLE.get(new_level + 1, 4200)
+            xp_needed = XP_TABLE.get(level + 1, 4200)
+            if cur_xp >= xp_needed:
+                cur_xp -= xp_needed
+                level += 1
+                if level > 99:
+                    prestige += 1
+                    level = 1
+                    cur_xp = 0
+            else:
+                break
+
+        return {
+            "totalXp": total_xp,
+            "levelVersion": level_version,
+            "level": level,
+            "prestigeLevel": prestige,
+            "currentXp": cur_xp,
+            "currentXpUpperBound": XP_TABLE.get(level + 1, 4200),
+        }
+    
+    @staticmethod
+    def calc_match_xp(
+        match_time: int,
+        is_first_match: bool,
+        consecutive_match: float,
+        emblem_qualities: List[str],
+    ) -> Dict[str, int]:
+        """
+        Считает XP за матч по правилам из конфига:
+          - базовый XP = match_time * XP_PER_UNIT, но не больше CAP
+          - эмблемы = сумма по EMBLEM_XP (например: None=0, Bronze=0, Silver=6, Gold=12, Iridescent=18)
+          - первый матч = FIRST_MATCH_BONUS
+          - итог = (base + emblems + first) * max(1.0, consecutive_match)
+        """
+        time_xp_raw = match_time * XP_PER_UNIT
+        base_time_xp = min(int(round(time_xp_raw)), CAP)
+
+        emblems_bonus = sum(EMBLEM_XP.get(e, 0) for e in emblem_qualities)
+
+        first_bonus = FIRST_MATCH_BONUS if is_first_match else 0
+
+        m = max(1.0, float(consecutive_match))
+
+        gained = int(round((base_time_xp + emblems_bonus + first_bonus) * m))
+
+        return {
+            "baseMatchXp": base_time_xp,
+            "emblemsBonus": emblems_bonus,
+            "firstMatchBonus": first_bonus,
+            "consecutiveMatchMultiplier": m,
+            "totalXpGained": gained,
+        }
+    
+    @staticmethod
+    def process_xp_gain(
+        current_xp: int,
+        current_level: int,       # 1..99
+        current_prestige: int,    # Devotion
+        gained_xp: int,
+    ) -> Dict[str, int]:
+        """
+        Перекидывает XP по таблице уровней XP_TABLE:
+          - XP_TABLE[n] = сколько нужно XP, чтобы перейти С ТЕКУЩЕГО уровня n-1 на n (или аналогичная ваша семантика).
+          - При пересечении 99 -> 1 увеличиваем prestige.
+        """
+        new_xp = current_xp + gained_xp
+        level = current_level
+        prestige = current_prestige
+
+        # Защита от кривых входов
+        if level < 1:
+            level = 1
+        if level > 99:
+            level = 99
+
+        # Пока хватает XP на ап
+        while True:
+            # Сколько надо до след. уровня?
+            # Если вы храните "XP до след. уровня" как XP_TABLE[level], используйте это.
+            # Если наоборот XP_TABLE[level+1], оставьте как ниже — главное, чтобы по всему проекту было единообразно.
+            xp_needed = XP_TABLE.get(level + 1)
+            if xp_needed is None:
+                # нет записи — по умолчанию 4200 (как у вас)
+                xp_needed = 4200
+
             if new_xp >= xp_needed:
                 new_xp -= xp_needed
-                new_level += 1
-                if new_level > 99:
-                    new_prestige += 1
-                    new_level = 1
-                    new_xp = 0
+                level += 1
+                if level > 99:
+                    prestige += 1
+                    level = 1
+                    new_xp = 0  # в старой системе часто сбрасывали; если нет — уберите это
             else:
                 break
 
         return {
             "currentXp": new_xp,
-            "currentXpUpperBound": XP_TABLE.get(new_level + 1, 4200),
-            "level": new_level,
-            "prestigeLevel": new_prestige
+            "currentXpUpperBound": XP_TABLE.get(level + 1, 4200),
+            "level": level,
+            "prestigeLevel": prestige,
         }
 
     @staticmethod

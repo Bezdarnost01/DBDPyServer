@@ -336,9 +336,10 @@ async def get_player_level(
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
 
-    profile_xp = getattr(user, "xp", 0) or 0
+    user_profile = await UserManager.get_user_profile(db=db_users, user_id=user_id)
 
-    level_object = Utils.xp_to_player_level(profile_xp)
+    current_xp = int(getattr(user_profile, "current_xp", 0))
+    level_object = Utils.xp_to_player_level(current_xp)
     return level_object
 
 @router.post("/players/ban/decayAndGetDisconnectionPenaltyPoints")

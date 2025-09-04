@@ -6,7 +6,9 @@ from db.users import get_user_session
 from dependency.redis import Redis
 from fastapi import Body
 from crud.sessions import SessionManager
+from crud.users import UserManager
 from schemas.queue import QueueRequest, CustomData
+from utils.utils import Utils
 import logging
 import time
 import json
@@ -214,5 +216,98 @@ async def put_analytics():
     return {}
 
 @router.post("/extensions/playerLevels/earnPlayerXp")
-async def earnPlayerXp():
-    return {}
+async def earnPlayerXp(
+    request: Request,
+    db_users: AsyncSession = Depends(get_user_session),
+    db_sessions: AsyncSession = Depends(get_sessions_session),
+):
+    bhvr_session = request.cookies.get("bhvrSession")
+    if not bhvr_session:
+        raise HTTPException(status_code=401, detail="No session cookie")
+
+    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    payload = await request.json()
+    match_time = int(payload.get("data", {}).get("matchTime", 0))
+    is_first_match = bool(payload.get("data", {}).get("isFirstMatch", False))
+    consecutive_match = float(payload.get("data", {}).get("consecutiveMatch", 1))
+    emblem_qualities = payload.get("data", {}).get("emblemQualities", []) or []
+    client_level_version = int(payload.get("data", {}).get("levelVersion", 34))
+
+    user_profile = await UserManager.get_user_profile(db=db_users, user_id=user_id)
+
+    current_xp = int(getattr(user_profile, "current_xp", 0))
+    current_level = int(getattr(user_profile, "level", 1))
+    current_prestige = int(getattr(user_profile, "prestige_level", 0))
+    total_xp_before = int(getattr(user_profile, "total_xp", 0))
+    level_version_server = int(getattr(user_profile, "level_version", client_level_version))
+
+    gain = Utils.calc_match_xp(
+        match_time=match_time,
+        is_first_match=is_first_match,
+        consecutive_match=consecutive_match,
+        emblem_qualities=emblem_qualities,
+    )
+
+    consecutive_bonus = int(
+        max(
+            0,
+            gain["totalXpGained"] - (gain["baseMatchXp"] + gain["emblemsBonus"] + gain["firstMatchBonus"]),
+        )
+    )
+
+    after = Utils.process_xp_gain(
+        current_xp=current_xp,
+        current_level=current_level,
+        current_prestige=current_prestige,
+        gained_xp=int(gain["totalXpGained"]),
+    )
+    total_xp_after = total_xp_before + int(gain["totalXpGained"])
+
+    rewards = Utils.calc_rewards(
+        old_level=current_level,
+        new_level=after["level"],
+        old_prestige=current_prestige,
+        new_prestige=after["prestigeLevel"],
+    )
+
+    await UserManager.update_user_profile(
+        db=db_users,
+        user_id=user_id,
+        current_xp=after["currentXp"],
+        current_xp_upper_bound=after["currentXpUpperBound"],
+        level=after["level"],
+        prestige_level=after["prestigeLevel"],
+        total_xp=total_xp_after,
+        level_version=level_version_server,
+    )
+
+    xp_breakdown = {
+        "baseMatchXp": int(gain["baseMatchXp"]),
+        "consecutiveMatchMultiplier": gain["consecutiveMatchMultiplier"],
+        "emblemsBonus": int(gain["emblemsBonus"]),
+        "firstMatchBonus": int(gain["firstMatchBonus"]),
+    }
+    if consecutive_bonus > 0:
+        xp_breakdown["consecutiveMatchBonus"] = consecutive_bonus
+
+    resp = {
+        "extensionProgress": "Success",
+        "levelInfo": {
+            "currentXp": int(after["currentXp"]),
+            "currentXpUpperBound": int(after["currentXpUpperBound"]),
+            "level": int(after["level"]),
+            "levelVersion": int(level_version_server),
+            "prestigeLevel": int(after["prestigeLevel"]),
+            "totalXp": int(total_xp_after),
+        },
+        "xpGainBreakdown": xp_breakdown,
+    }
+
+    # если есть награды — добавляем
+    if rewards:
+        resp["grantedCurrencies"] = rewards
+
+    return resp

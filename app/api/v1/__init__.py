@@ -10,7 +10,8 @@ from .party.party import router as party_router
 from .matchmaking.queue import router as queue_router
 from .users.cdn import router as cdn_router
 from .admin.users import router as admin_users_router
+from .auth.auth import router as auth_users_router
 
 routers = [login_router, server_status_router, utils_router, profile_router,
            reward_router, store_router, archives_router, rtm_router, party_router, cdn_router,
-           admin_users_router, queue_router]
+           admin_users_router, queue_router, auth_users_router]
