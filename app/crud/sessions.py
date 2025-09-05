@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, func
 from models.sessions import Sessions
-from datetime import datetime, timezone
+from datetime import datetime
 import pytz
 
 MOSCOW = pytz.timezone("Europe/Moscow")

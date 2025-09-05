@@ -1,9 +1,13 @@
 from functools import wraps
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.responses import Response
 from crud.sessions import SessionManager
-import logging, time, functools, inspect, traceback, json, os
+import logging
+import time
+import functools
+import inspect
+import traceback
+import os
 from typing import Any, Callable
 
 def refresh_session(func):

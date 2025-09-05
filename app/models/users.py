@@ -2,8 +2,6 @@ from sqlalchemy import Integer, BigInteger, String, Column, DateTime, Boolean, L
 from sqlalchemy.orm import relationship
 from db.users import UsersBase
 from utils.users import UserWorker
-from models.inventory import UserInventory
-from models.wallet import UserWallet
 from datetime import datetime
 import pytz
 

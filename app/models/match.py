@@ -1,6 +1,6 @@
 import pytz
 from db.sessions import SessionsBase
-from sqlalchemy import Integer, String, Column, BigInteger, DateTime, UniqueConstraint
+from sqlalchemy import Integer, String, Column, BigInteger, DateTime
 from datetime import datetime
 
 MOSCOW = pytz.timezone("Europe/Moscow")

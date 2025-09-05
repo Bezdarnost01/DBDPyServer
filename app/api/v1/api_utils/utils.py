@@ -15,7 +15,7 @@ async def get_version():
     return settings.version
 
 @router.get("/utils/contentVersion/version", response_model=ContentVersionResponse)
-async def healthcheck():
+async def content_version():
     return settings.content_version
 
 @router.post("/extensions/eac/generateChallenge", response_model=EacChallengeResponse)

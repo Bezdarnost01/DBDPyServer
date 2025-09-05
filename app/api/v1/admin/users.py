@@ -1,7 +1,6 @@
-import logging
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.admin import KickUserRequest, SetUserSaveRequest, BanUserRequest
+from schemas.admin import KickUserRequest, BanUserRequest
 from schemas.config import settings
 from crud.users import UserManager
 from crud.websocket import WSManager

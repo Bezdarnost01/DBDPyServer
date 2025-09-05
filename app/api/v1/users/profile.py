@@ -6,8 +6,6 @@ from db.sessions import get_sessions_session
 from crud.sessions import SessionManager
 from crud.users import UserManager
 from utils.utils import Utils
-from utils.users import UserWorker
-from utils.decorators import log_call
 from dependency.redis import Redis
 import logging
 logger = logging.getLogger(__name__) 

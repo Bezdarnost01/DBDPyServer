@@ -7,7 +7,7 @@ from dependency.redis import Redis
 from fastapi import Body
 from crud.sessions import SessionManager
 from crud.users import UserManager
-from schemas.queue import QueueRequest, CustomData
+from schemas.queue import QueueRequest
 from utils.utils import Utils
 import logging
 import time

@@ -1,15 +1,13 @@
 import httpx
-import os
 import re
 import base64
 import zlib
-import struct
 import json
 import asyncio
 from Crypto.Cipher import AES
 from pathlib import Path
 from typing import Optional, List
-from typing import List, Dict
+from typing import Dict
 import random
 from configs.config import EMBLEM_XP, XP_PER_UNIT, CAP, FIRST_MATCH_BONUS, XP_TABLE
 import logging

@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, BigInteger, String, Column, DateTime, Boolean, LargeBinary, ForeignKey
+from sqlalchemy import Integer, BigInteger, String, Column, ForeignKey
 from sqlalchemy.orm import relationship
 from db.users import UsersBase
 

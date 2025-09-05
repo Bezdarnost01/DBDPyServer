@@ -1,21 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.config import settings
-from schemas.party import PartyInviteRequest
 from db.users import get_user_session
 from db.sessions import get_sessions_session
 from db.matchmaking import get_matchmaking_session
 import random
 import time
 import logging
-import json
 import asyncio
 import uuid
-from utils.decorators import log_call
 from crud.sessions import SessionManager
 from crud.users import UserManager
-from utils.utils import Utils
 from typing import Any, Dict, Optional
 import copy
 from crud.websocket import ws_manager

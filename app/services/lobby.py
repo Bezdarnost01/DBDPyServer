@@ -1,6 +1,5 @@
 import uuid
 import json
-from typing import Optional, List
 from aioredis import Redis
 import time
 

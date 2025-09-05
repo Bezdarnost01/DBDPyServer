@@ -3,9 +3,8 @@ from sqlalchemy import select, update, delete
 from models.websocket import WebsocketSession
 from datetime import datetime
 from fastapi import WebSocket
-from typing import Optional, List, Dict
+from typing import List, Dict
 import pytz
-import logging
 
 MOSCOW = pytz.timezone("Europe/Moscow")
 
@@ -68,7 +67,7 @@ class WSManager:
         q = (
             select(WebsocketSession)
             .where(WebsocketSession.user_id == user_id)
-            .where(WebsocketSession.is_active == True)
+            .where(WebsocketSession.is_active)
         )
         res = await db.execute(q)
         return res.scalars().all()

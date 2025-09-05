@@ -1,11 +1,9 @@
-import logging
 import uuid
 import time
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.config import settings
 from db.users import get_user_session
-from utils.decorators import log_call
 from db.sessions import get_sessions_session
 from utils.utils import Utils 
 from utils.sessions import SessionWorker

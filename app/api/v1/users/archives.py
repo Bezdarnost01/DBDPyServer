@@ -1,11 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Query
 from schemas.config import settings
-from db.users import get_user_session
-from db.sessions import get_sessions_session
-from crud.sessions import SessionManager
-from crud.users import UserManager
-from utils.utils import Utils
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Archives"])
 

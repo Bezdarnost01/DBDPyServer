@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy.sql import func
 from db.sessions import SessionsBase
 from datetime import datetime
 import pytz

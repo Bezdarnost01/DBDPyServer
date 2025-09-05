@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Response, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi import APIRouter, Response
+from fastapi.responses import JSONResponse
 import json
 from fastapi.responses import FileResponse
 from pathlib import Path
 from typing import Any
-from utils.decorators import log_call
 from schemas.config import settings
 
 router = APIRouter(tags=["CDN"])

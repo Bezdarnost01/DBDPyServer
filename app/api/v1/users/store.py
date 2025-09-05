@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.config import settings
@@ -160,7 +160,7 @@ async def update_user_consent(
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
 
-    data = await request.json()
+    await request.json()
     # data = {'list': [{'consentId': ..., 'isGiven': ...}, ...]}
 
     # Тут можешь сохранить согласия юзера в БД, если надо

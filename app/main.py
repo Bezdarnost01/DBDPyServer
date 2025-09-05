@@ -1,7 +1,6 @@
 import logging
 import asyncio
 import time
-import uvicorn
 import sys
 from fastapi import FastAPI
 import redis.asyncio as redis
@@ -37,7 +36,7 @@ async def regular_session_cleanup():
 async def cleanup_dead_lobbies(redis, lobby_manager, check_interval=20):
     while True:
         open_lobbies = await redis.smembers("lobbies:open")
-        now = int(time.time())
+        int(time.time())
         for match_id in open_lobbies:
             ping = await redis.get(f"lobby_ping:{match_id}")
             if ping is None:

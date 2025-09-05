@@ -1,17 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.config import settings
 from db.users import get_user_session
 from db.sessions import get_sessions_session
 from crud.sessions import SessionManager
-from crud.users import UserManager
 import uuid
-import base64
-from utils.utils import Utils
 from crud.websocket import ws_manager
-from utils.users import UserWorker
-import logging
-import asyncio
 
 
 router = APIRouter(tags=["RTM"])
@@ -49,7 +42,7 @@ async def websocket_rtm(websocket: WebSocket, path: str, db_sessions: AsyncSessi
 
     try:
         while True:
-            data = await websocket.receive_text()
+            await websocket.receive_text()
             # Можешь здесь обрабатывать входящие сообщения, например
             # await ws_manager.send_to_user(user_id, {"echo": data})
     except WebSocketDisconnect:

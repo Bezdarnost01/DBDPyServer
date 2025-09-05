@@ -1,5 +1,4 @@
 import json
-import aioredis
 from fastapi import Request
 from crud.users import UserManager
 from utils.utils import Utils
