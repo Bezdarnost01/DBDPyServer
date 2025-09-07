@@ -23,14 +23,13 @@ async def steam_login(token: str, response: Response,
     if not steam_id:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    user_in = UserCreate(steam_id=steam_id)
-    user = await UserManager.create_user(db_users, user_in=user_in)
+    user = await UserManager.get_user(db_users, steam_id=steam_id)
     if user is None:
-        user = await UserManager.get_user(db_users, steam_id=steam_id)
-    await UserManager.update_last_login(db_users, steam_id=steam_id)
+        raise HTTPException(status_code=403, detail="Login via launcher first")
 
     if user.is_banned:
         raise HTTPException(status_code=401, detail="You`re banned")
+    await UserManager.update_last_login(db_users, steam_id=steam_id)
 
     cloud_id = user.user_id
     now = int(time.time())

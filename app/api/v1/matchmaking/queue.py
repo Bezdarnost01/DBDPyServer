@@ -87,7 +87,7 @@ async def match_register(
     
     response = {
         "matchId": lobby["id"],
-        "category": "live-413207-live:None:Windows:all::1:4:0:G:2",
+        "category": "live-138518-live:None:Windows:all::1:4:0:G:2",
         "creationDateTime": int(time.time()),
         "status": "OPENED",
         "creator": lobby["host"]["userId"],
@@ -120,7 +120,7 @@ async def create_match_response(lobby_manager: LobbyManager, match_id: str, kill
         return {}
     return {
         "matchId": match_id,
-        "category": "live-413207-live:None:Windows:all::1:4:0:G:2",
+        "category": "live-138518-live:None:Windows:all::1:4:0:G:2",
         "creationDateTime": int(time.time()),
         "status": "CLOSED" if killed else "OPENED",
         "creator": lobby["host"]["userId"],
@@ -235,6 +235,7 @@ async def earnPlayerXp(
     consecutive_match = float(payload.get("data", {}).get("consecutiveMatch", 1))
     emblem_qualities = payload.get("data", {}).get("emblemQualities", []) or []
     client_level_version = int(payload.get("data", {}).get("levelVersion", 34))
+    player_type = str(payload.get("data", {}).get("playerType", "killer"))
 
     user_profile = await UserManager.get_user_profile(db=db_users, user_id=user_id)
 
@@ -247,6 +248,7 @@ async def earnPlayerXp(
     gain = Utils.calc_match_xp(
         match_time=match_time,
         is_first_match=is_first_match,
+        player_type=player_type,
         consecutive_match=consecutive_match,
         emblem_qualities=emblem_qualities,
     )
@@ -309,5 +311,7 @@ async def earnPlayerXp(
     # если есть награды — добавляем
     if rewards:
         resp["grantedCurrencies"] = rewards
+        for r in rewards:
+            await UserManager.update_wallet(db=db_users, user_id=user_id, currency=r["currency"], delta=r["balance"])
 
     return resp

@@ -77,13 +77,13 @@ class Utils:
             return None
     
     @staticmethod
-    def xp_to_player_level(total_xp: int) -> Dict[str, int]:
+    def xp_to_player_level(total_xp: int, current_level: int) -> Dict[str, int]:
         """
         Преобразует общий накопленный XP в состояние уровня/престижа, используя XP_TABLE.
         """
         level_version = 34
         prestige = 0
-        level = 1
+        level = current_level
         cur_xp = total_xp
 
         while True:
@@ -111,6 +111,7 @@ class Utils:
     def calc_match_xp(
         match_time: int,
         is_first_match: bool,
+        player_type: str,
         consecutive_match: float,
         emblem_qualities: List[str],
     ) -> Dict[str, int]:
@@ -126,7 +127,7 @@ class Utils:
 
         emblems_bonus = sum(EMBLEM_XP.get(e, 0) for e in emblem_qualities)
 
-        first_bonus = FIRST_MATCH_BONUS if is_first_match else 0
+        first_bonus = FIRST_MATCH_BONUS if is_first_match and player_type != "killer" else 0
 
         m = max(1.0, float(consecutive_match))
 

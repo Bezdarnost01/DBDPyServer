@@ -6,6 +6,7 @@ from db.sessions import get_sessions_session
 from crud.sessions import SessionManager
 from crud.users import UserManager
 from utils.utils import Utils
+from utils.users import UserWorker
 from dependency.redis import Redis
 import logging
 logger = logging.getLogger(__name__) 
@@ -114,7 +115,11 @@ async def get_localized_currencies_after_login(
     if not user:
         raise HTTPException(404, detail="User not found")
     
-    wallet = await UserManager.get_wallet(db=db_users, user_id=user.id) or []
+    user_save_stats = await UserWorker.get_stats_from_save(db_users, user_id=user_id)
+
+    await UserManager.set_wallet_balance(db_users, user_id=user_id, currency="Bloodpoints", balance=user_save_stats.experience)
+
+    wallet = await UserManager.get_wallet(db=db_users, user_id=user_id) or []
     balances = {w.currency: w.balance for w in wallet}
     
     from configs.config import CURRENCIES
@@ -142,6 +147,10 @@ async def get_wallet_currencies(
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         return Response(status_code=404)
+
+    user_save_stats = await UserWorker.get_stats_from_save(db_users, user_id=user_id)
+
+    await UserManager.set_wallet_balance(db_users, user_id=user_id, currency="Bloodpoints", balance=user_save_stats.experience)
 
     wallets = await UserManager.get_wallet(db_users, user_id) or []
     balances = {w.currency: w.balance for w in wallets}
@@ -336,8 +345,9 @@ async def get_player_level(
 
     user_profile = await UserManager.get_user_profile(db=db_users, user_id=user_id)
 
+    current_level = int(getattr(user_profile, "level", 0))
     current_xp = int(getattr(user_profile, "current_xp", 0))
-    level_object = Utils.xp_to_player_level(current_xp)
+    level_object = Utils.xp_to_player_level(current_xp, current_level)
     return level_object
 
 @router.post("/players/ban/decayAndGetDisconnectionPenaltyPoints")

@@ -2,8 +2,10 @@ import time
 from crud.sessions import SessionManager
 from db.sessions import get_sessions_session
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
+from services.lobby import LobbyManager
+from services.queue import MatchQueue
 import datetime
 
 router = APIRouter()
@@ -11,14 +13,60 @@ router = APIRouter()
 start_time = time.time()
 
 @router.get("/server-status")
-async def server_status(db: AsyncSession = Depends(get_sessions_session)):
-    from datetime import datetime
+async def server_status(request: Request, db: AsyncSession = Depends(get_sessions_session)):
+    """
+    Возвращает текущий статус сервера.
+
+    **Поля ответа:**
+
+    - **uptime** (`str`): время работы сервера с момента запуска в секундах  
+      (например `"12345 seconds"`).
+
+    - **online** (`int`): количество активных пользовательских сессий  
+      (берётся через `SessionManager.get_sessions_count`).
+
+    - **timestamp** (`str`): текущая метка времени в UTC формате ISO8601  
+      (например `"2025-09-07T19:52:13.123456"`).
+
+    - **queues** (`dict`): статистика очередей матчмейкера.
+      
+      - **A** (`dict`): состояние очереди игроков стороны A (киллеры).
+        - `openLobbies` (`int`): количество открытых лобби (готовы, но матч не стартовал).
+        - `queueA` (`int`): количество игроков A в очереди.
+        - `queueB` (`int`): количество игроков B (для этого инстанса обычно `0`).
+        - `queuedTotal` (`int`): общее число игроков A+B в этой очереди.
+
+      - **B** (`dict`): состояние очереди игроков стороны B (сурвы).
+        - `openLobbies` (`int`): количество открытых лобби, ожидающих игроков B.
+        - `queueA` (`int`): количество игроков A (обычно `0`).
+        - `queueB` (`int`): количество игроков B, ожидающих слота.
+        - `queuedTotal` (`int`): общее число игроков A+B в этой очереди.
+
+      - **totalOpenLobbies** (`int`): общее количество открытых лобби по обеим сторонам.
+      - **totalQueued** (`int`): суммарное количество игроков в очереди (A+B).
+    """
     uptime = int(time.time() - start_time)
     online = await SessionManager.get_sessions_count(db)
+
+    # Создаём очереди на лету (как в /match)
+    redis = request.app.state.redis
+    lobby_manager = request.app.state.lobby_manager
+    queue_a = MatchQueue(redis, side="A", lobby_manager=lobby_manager)
+    queue_b = MatchQueue(redis, side="B", lobby_manager=lobby_manager)
+
+    stats_a = await queue_a.get_stats()  # {"openLobbies": X, "queue": lenA}
+    stats_b = await queue_b.get_stats()  # {"openLobbies": X, "queue": lenB}
+
     return {
         "uptime": f"{uptime} seconds",
         "online": online,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "queues": {
+            "A": stats_a,
+            "B": stats_b,
+            "totalOpenLobbies": stats_a["openLobbies"],           # = stats_b["openLobbies"]
+            "totalQueued": stats_a["queue"] + stats_b["queue"]
+        }
     }
 
 def get_date_string_minus_2_hours():
