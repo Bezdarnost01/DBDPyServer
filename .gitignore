@@ -4,3 +4,5 @@ __pycache__/
 app/log/*
 app/logs/*
 data/*
+.ruff_cache
+.mypy_cache

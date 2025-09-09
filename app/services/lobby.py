@@ -1,7 +1,9 @@
-import uuid
 import json
-from aioredis import Redis
 import time
+import uuid
+
+from aioredis import Redis
+
 
 class LobbyManager:
     """
@@ -9,16 +11,16 @@ class LobbyManager:
     Хранит каждое лобби как ключ 'lobby:{id}' (JSON),
     а список всех лобби — как SET 'lobbies:open'.
     """
-    def __init__(self, redis: Redis):
+
+    def __init__(self, redis: Redis) -> None:
         self.redis = redis
 
     async def get_lobby_by_id(self, id: int):
         lobby_json = await self.redis.get(f"lobby:{id}")
         if not lobby_json:
             return None
-        lobby = json.loads(lobby_json)
+        return json.loads(lobby_json)
 
-        return lobby
 
     async def get_killed_lobby_by_id(self, lobby_id: str):
         lobby_json = await self.redis.get(f"killed_lobby:{lobby_id}")
@@ -26,7 +28,7 @@ class LobbyManager:
             return None
         return json.loads(lobby_json)
 
-    async def create_lobby(self, host: dict, match_id: str = None) -> str:
+    async def create_lobby(self, host: dict, match_id: str | None = None) -> str:
         if not match_id:
             match_id = str(uuid.uuid4())
         lobby_key = f"lobby:{match_id}"
@@ -50,12 +52,12 @@ class LobbyManager:
             "nonHosts": [],
             "isReady": False,
             "isPrepared": False,
-            "hasStarted": False
+            "hasStarted": False,
         }
         await self.redis.set(lobby_key, json.dumps(lobby))
         await self.redis.sadd("lobbies:open", match_id)
         return match_id
-    
+
     async def register_match(self, match_id: str, session_settings: dict):
         lobby_json = await self.redis.get(f"lobby:{match_id}")
         if not lobby_json:
@@ -66,9 +68,9 @@ class LobbyManager:
         lobby["sessionSettings"] = session_settings
 
         await self.redis.set(f"lobby:{match_id}", json.dumps(lobby))
-        return lobby 
-    
-    async def delete_match(self, match_id: str):
+        return lobby
+
+    async def delete_match(self, match_id: str) -> None:
         lobby_json = await self.redis.get(f"lobby:{match_id}")
         if not lobby_json:
             return
@@ -86,8 +88,8 @@ class LobbyManager:
             return False
         lobby = json.loads(lobby_json)
         return lobby["host"]["bhvrSession"] == bhvr_session
-    
-    async def delete_old_matches(self, minutes: int = 5):
+
+    async def delete_old_matches(self, minutes: int = 5) -> None:
         cutoff = int(time.time() * 1000) - minutes * 60 * 1000
         killed_ids = await self.redis.smembers("lobbies:killed")
         for lobby_id in killed_ids:

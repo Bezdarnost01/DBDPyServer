@@ -1,14 +1,17 @@
-from functools import wraps
-from fastapi import Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from crud.sessions import SessionManager
-import logging
-import time
 import functools
 import inspect
-import traceback
+import logging
 import os
-from typing import Any, Callable
+import time
+import traceback
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
+from crud.sessions import SessionManager
+from fastapi import Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 def refresh_session(func):
     """
@@ -39,9 +42,7 @@ def refresh_session(func):
     return wrapper
 
 def setup_call_logger(file_path: str = "trace.log") -> logging.Logger:
-    """
-    Создаёт/возвращает логгер для call-трейсов.
-    """
+    """Создаёт/возвращает логгер для call-трейсов."""
     logger = logging.getLogger("call-trace")
     if logger.handlers:
         return logger
@@ -113,7 +114,7 @@ async def _run(fn, args, kwargs, logger, is_async: bool):
 
     except Exception as exc:
         dt = (time.perf_counter() - t0) * 1000
-        logger.error(
+        logger.exception(
             "ERR  %s | %.1f ms | %s\n%s",
             call_id,
             dt,

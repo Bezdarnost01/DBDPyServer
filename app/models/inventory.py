@@ -1,6 +1,7 @@
-from sqlalchemy import Integer, String, Column, BigInteger, ForeignKey
-from sqlalchemy.orm import relationship
 from db.users import UsersBase
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
 
 class UserInventory(UsersBase):
     __tablename__ = "user_inventory"

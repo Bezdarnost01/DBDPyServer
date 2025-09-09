@@ -1,7 +1,9 @@
 import json
-from fastapi import Request
+
 from crud.users import UserManager
+from fastapi import Request
 from utils.utils import Utils
+
 
 class Redis:
     @staticmethod
@@ -9,18 +11,14 @@ class Redis:
         return request.app.state.redis
 
     @staticmethod
-    async def update_catalog_in_redis(json_data, redis):
-        """
-        Кладёт сериализованный JSON-каталог в Redis по ключу 'catalog:json'.
-        """
+    async def update_catalog_in_redis(json_data, redis) -> None:
+        """Кладёт сериализованный JSON-каталог в Redis по ключу 'catalog:json'."""
         # json_data — это уже python-список (list[dict])
         await redis.set("catalog:json", json.dumps(json_data))
 
     @staticmethod
     async def get_catalog_from_redis(redis):
-        """
-        Получает декодированный JSON-каталог из Redis.
-        """
+        """Получает декодированный JSON-каталог из Redis."""
         raw = await redis.get("catalog:json")
         if not raw:
             return None
@@ -77,15 +75,13 @@ class Redis:
         return None
 
     @staticmethod
-    async def set_friends_list(redis, user_id, ids, friends_list, ttl=15):
+    async def set_friends_list(redis, user_id, ids, friends_list, ttl=15) -> None:
         cache_key = f"friendslist:{user_id}:{hash(tuple(sorted(ids)))}"
         await redis.set(cache_key, json.dumps(friends_list), ex=ttl)
 
     @staticmethod
-    async def set_friend_ids(redis, user_id, steam_ids, ttl=60):
-        """
-        Кэширует список steam_id друзей для user_id.
-        """
+    async def set_friend_ids(redis, user_id, steam_ids, ttl=60) -> None:
+        """Кэширует список steam_id друзей для user_id."""
         cache_key = f"friendsids:{user_id}"
         await redis.set(cache_key, json.dumps(steam_ids), ex=ttl)
 

@@ -1,15 +1,16 @@
-from urllib.parse import urlencode
+import logging
 import os
 import re
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
+from urllib.parse import urlencode
 
-from schemas.config import settings
-from db.users import get_user_session
-from schemas.users import UserCreate
+import httpx
 from crud.users import UserManager
-import logging
+from db.users import get_user_session
+from fastapi import APIRouter, Depends, HTTPException, Request
+from schemas.config import settings
+from schemas.users import UserCreate
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = logging.getLogger("steam-auth")
 
@@ -62,11 +63,10 @@ async def fetch_profile(steam_id: str) -> tuple[str | None, str | None]:
                 log.error("WebAPI %s: %s", r.status_code, r.text[:300])
         except Exception as e:
             log.exception("WebAPI request failed: %s", e)
+    elif not api_key:
+        log.warning("STEAM_API_KEY not set; using XML fallback")
     else:
-        if not api_key:
-            log.warning("STEAM_API_KEY not set; using XML fallback")
-        else:
-            log.warning("STEAM_API_KEY looks invalid; using XML fallback")
+        log.warning("STEAM_API_KEY looks invalid; using XML fallback")
 
     # 2) XML фолбэк (публичный профиль)
     try:
@@ -79,8 +79,7 @@ async def fetch_profile(steam_id: str) -> tuple[str | None, str | None]:
             name = (root.findtext("steamID") or None)
             avatar = (root.findtext("avatarFull") or root.findtext("avatarMedium") or root.findtext("avatarIcon") or None)
             return name, avatar
-        else:
-            log.warning("XML profile not accessible for %s (status %s)", steam_id, r.status_code)
+        log.warning("XML profile not accessible for %s (status %s)", steam_id, r.status_code)
     except Exception as e:
         log.exception("XML fallback failed: %s", e)
 
@@ -101,7 +100,7 @@ async def launcher_login_url():
 @router.get("/auth/provider/steam/launcher-callback")
 async def launcher_callback(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
     qp = dict(request.query_params)
     if not qp:
@@ -155,5 +154,5 @@ async def launcher_callback(
         "user_id": user.user_id,       # твой cloud_id
         "name": name,
         "avatar": avatar,
-        "is_first_login": bool(getattr(user, "is_first_login", False) == False if first else getattr(user, "is_first_login", False)),
+        "is_first_login": bool(not getattr(user, "is_first_login", False) if first else getattr(user, "is_first_login", False)),
     }

@@ -7,7 +7,7 @@ STARTING_WALLET = [
 CURRENCIES = [
     "Dust", "Bloodpoints", "BonusBloodpoints", "HardCurrency", "testCurrency",
     "Shards", "Cells", "USCents", "Halloween2018Coins", "HalloweenCoins",
-    "LunarCoins", "LunarNewYearCoins", "HalloweenEventCurrency"
+    "LunarCoins", "LunarNewYearCoins", "HalloweenEventCurrency",
 ]
 
 XP_TABLE = {

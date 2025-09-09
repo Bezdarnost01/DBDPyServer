@@ -1,15 +1,15 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update, func
-from models.sessions import Sessions
 from datetime import datetime
+
 import pytz
+from models.sessions import Sessions
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 MOSCOW = pytz.timezone("Europe/Moscow")
 
 class SessionManager:
-    """
-    Менеджер для работы сессиями пользователей.
-    """
+    """Менеджер для работы сессиями пользователей."""
+
     @staticmethod
     async def create_session(db: AsyncSession, bhvr_session: str, user_id: str, steam_id: int, expires: int) -> Sessions:
         """
@@ -24,6 +24,7 @@ class SessionManager:
 
         Returns:
             Sessions: Созданная сессия.
+
         """
         await db.execute(delete(Sessions).where(Sessions.steam_id == steam_id))
         await db.commit()
@@ -41,7 +42,7 @@ class SessionManager:
         return session
 
     @staticmethod
-    async def delete_session(db: AsyncSession, bhvr_session: str = None, user_id: str = None) -> int | None:
+    async def delete_session(db: AsyncSession, bhvr_session: str | None = None, user_id: str | None = None) -> int | None:
         """
         Удаляет сессию по её bhvr_session.
 
@@ -51,6 +52,7 @@ class SessionManager:
 
         Returns:
             int: Количество удалённых строк.
+
         """
         if bhvr_session:
             exists_stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
@@ -63,8 +65,8 @@ class SessionManager:
             result = await db.execute(stmt)
             await db.commit()
             return result.rowcount
-        
-        elif user_id:
+
+        if user_id:
             exists_stmt = select(Sessions).where(Sessions.user_id == user_id)
             res = await db.execute(exists_stmt)
             session = res.scalars().first()
@@ -76,8 +78,7 @@ class SessionManager:
             await db.commit()
             return result.rowcount
 
-        else:
-            return False
+        return False
 
     @staticmethod
     async def extend_session(db: AsyncSession, bhvr_session: str, extend_seconds: int) -> bool:
@@ -91,6 +92,7 @@ class SessionManager:
 
         Returns:
             bool: True если успешно, иначе False.
+
         """
         now = int(datetime.now(MOSCOW).timestamp())
         new_expire = now + extend_seconds
@@ -115,12 +117,13 @@ class SessionManager:
 
         Returns:
             int | None: Steam ID или None если не найдено.
+
         """
         stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
         result = await db.execute(stmt)
         session = result.scalar_one_or_none()
         return session.steam_id if session else None
-    
+
     @staticmethod
     async def get_user_id_by_session(db: AsyncSession, bhvr_session: str) -> str | None:
         """
@@ -132,12 +135,13 @@ class SessionManager:
 
         Returns:
             str | None: User ID или None если не найдено.
+
         """
         stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
         result = await db.execute(stmt)
         session = result.scalar_one_or_none()
         return session.user_id if session else None
-    
+
     @staticmethod
     async def get_user_session_by_user_id(db: AsyncSession, user_id: str) -> Sessions | None:
         """
@@ -149,6 +153,7 @@ class SessionManager:
 
         Returns:
             str | None: session или None если не найдено.
+
         """
         stmt = select(Sessions).where(Sessions.user_id == user_id)
         result = await db.execute(stmt)
@@ -168,6 +173,7 @@ class SessionManager:
 
         Returns:
             bool: True если продлили, False если не было необходимости или не найдено.
+
         """
         stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
         result = await db.execute(stmt)
@@ -190,6 +196,7 @@ class SessionManager:
 
         Returns:
             int: Количество удалённых сессий.
+
         """
         now = int(datetime.now(MOSCOW).timestamp())
         stmt = delete(Sessions).where(Sessions.expires < now)
@@ -207,16 +214,14 @@ class SessionManager:
 
         Returns:
             int: Количество сессий.
+
         """
         now = int(datetime.now(MOSCOW).timestamp())
         stmt = select(func.count()).select_from(Sessions).where(Sessions.expires > now)
         result = await db.execute(stmt)
-        count = result.scalar_one()
-        return count
-    
-    async def get_all_online_user_ids(db: AsyncSession) -> set[str]:
-        """
-        Возвращает set user_id всех пользователей с активной сессией.
-        """
-        result = await db.execute(select(Sessions.user_id))
+        return result.scalar_one()
+
+    async def get_all_online_user_ids(self: AsyncSession) -> set[str]:
+        """Возвращает set user_id всех пользователей с активной сессией."""
+        result = await self.execute(select(Sessions.user_id))
         return set(result.scalars().all())

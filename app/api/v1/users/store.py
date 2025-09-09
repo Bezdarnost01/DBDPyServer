@@ -1,43 +1,45 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.config import settings
+import logging
 import time
-from db.users import get_user_session
-from db.sessions import get_sessions_session
+from typing import Annotated
+
 from crud.sessions import SessionManager
 from crud.users import UserManager
-from utils.utils import Utils
+from db.sessions import get_sessions_session
+from db.users import get_user_session
 from dependency.redis import Redis
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from schemas.config import settings
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils.utils import Utils
 
-import logging
-logger = logging.getLogger(__name__) 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Store"])
 
 @router.get("/extensions/store/steamGetPendingTransactions")
 async def steam_get_pending_transactions():
     return {
-        "transactionOrderIdList": []
+        "transactionOrderIdList": [],
     }
 
 @router.post("/extensions/store/steamGetPendingTransactions")
 async def get_pending_transactions(request: Request,
-                        db_users: AsyncSession = Depends(get_user_session),
-                        db_sessions: AsyncSession = Depends(get_sessions_session)
+                        db_users: Annotated[AsyncSession, Depends(get_user_session)],
+                        db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         raise HTTPException(404, detail="User not found")
-    
+
     user_id = user.user_id
 
     now = int(time.time())
@@ -47,61 +49,61 @@ async def get_pending_transactions(request: Request,
             "isGiven": True,
             "updatedDate": now,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v4"}
+            "latestVersion": {"entryDate": 1688342400, "label": "v4"},
         },
         {
             "consentId": "eula_psn_eu",
             "isGiven": True,
             "updatedDate": now,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v5"}
+            "latestVersion": {"entryDate": 1688342400, "label": "v5"},
         },
         {
             "consentId": "eula_psn_na",
             "isGiven": True,
             "updatedDate": now,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v5"}
+            "latestVersion": {"entryDate": 1688342400, "label": "v5"},
         },
         {
             "consentId": "marketing",
             "isGiven": True,
             "updatedDate": now,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1676246400, "label": "v2"}
+            "latestVersion": {"entryDate": 1676246400, "label": "v2"},
         },
         {
             "consentId": "privacy",
             "isGiven": True,
             "updatedDate": now,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v3"}
-        }
+            "latestVersion": {"entryDate": 1688342400, "label": "v3"},
+        },
     ]
     return {
         "userId": user_id,
-        "consentList": consent_list
+        "consentList": consent_list,
     }
 
 @router.get("/consent")
 async def get_user_consent(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session),
-    onlyAttentionNeeded: bool = False
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
+    onlyAttentionNeeded: bool = False,
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         raise HTTPException(404, detail="User not found")
-    
+
     user_id = user.user_id
 
     consent_list = [
@@ -110,48 +112,48 @@ async def get_user_consent(
             "isGiven": True,
             "updatedDate": 1744010648,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v4"}
+            "latestVersion": {"entryDate": 1688342400, "label": "v4"},
         },
         {
             "consentId": "eula_psn_eu",
             "isGiven": True,
             "updatedDate": 1744010648,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v5"}
+            "latestVersion": {"entryDate": 1688342400, "label": "v5"},
         },
         {
             "consentId": "eula_psn_na",
             "isGiven": True,
             "updatedDate": 1744010648,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v5"}
+            "latestVersion": {"entryDate": 1688342400, "label": "v5"},
         },
         {
             "consentId": "marketing",
             "isGiven": True,
             "updatedDate": 1744010648,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1676246400, "label": "v2"}
+            "latestVersion": {"entryDate": 1676246400, "label": "v2"},
         },
         {
             "consentId": "privacy",
             "isGiven": True,
             "updatedDate": 1744010648,
             "attentionNeeded": False,
-            "latestVersion": {"entryDate": 1688342400, "label": "v3"}
-        }
+            "latestVersion": {"entryDate": 1688342400, "label": "v3"},
+        },
     ]
-    
+
     return {
         "userId": user_id,
-        "consentList": consent_list
+        "consentList": consent_list,
     }
 
 @router.put("/consent")
 async def update_user_consent(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -173,8 +175,8 @@ async def update_user_consent(
 @router.post("/purchases/{character_name}")
 async def buy_character(character_name: str,
                         request: Request,
-                        db_users: AsyncSession = Depends(get_user_session),
-                        db_sessions: AsyncSession = Depends(get_sessions_session),
+                        db_users: Annotated[AsyncSession, Depends(get_user_session)],
+                        db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
                         redis = Depends(Redis.get_redis)):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -182,11 +184,11 @@ async def buy_character(character_name: str,
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    
+
     wallet = await UserManager.get_wallet(db_users, user_id)
 
     data = await request.json()
@@ -202,25 +204,26 @@ async def buy_character(character_name: str,
 
     if currency_balance < price:
         raise HTTPException(400, detail="Not enough currency")
-    
+
     if currency_balance >= price:
         await UserManager.update_wallet(db_users, user_id, currency_type, -price)
         await UserManager.add_inventory_item(db_users, user_id, character_name, 1)
 
-        new_balance = currency_balance - price 
+        new_balance = currency_balance - price
 
         response = {
             "boughtItemIds": [character_name],
             "remainingBalance": new_balance,
-            "currencyId": currency_type
+            "currencyId": currency_type,
         }
-    
+
         return JSONResponse(content=response, status_code=200)
+    return None
 
 @router.post("/extensions/store/purchaseOutfit")
 async def buy_outfit(request: Request,
-                        db_users: AsyncSession = Depends(get_user_session),
-                        db_sessions: AsyncSession = Depends(get_sessions_session),
+                        db_users: Annotated[AsyncSession, Depends(get_user_session)],
+                        db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
                         redis = Depends(Redis.get_redis)):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -249,23 +252,23 @@ async def buy_outfit(request: Request,
         raise HTTPException(400, detail="Not enough currency")
 
     await UserManager.update_wallet(db_users, user_id, currency_type, -total_price)
-    for item_id in prices.keys():
+    for item_id in prices:
         await UserManager.add_inventory_item(db_users, user_id, item_id, 1)
 
-    new_balance = currency_balance - total_price 
+    new_balance = currency_balance - total_price
 
     response = {
         "boughtItemIds": list(prices.keys()),
         "remainingBalance": new_balance,
-        "currencyId": currency_type
+        "currencyId": currency_type,
     }
 
     return JSONResponse(content=response, status_code=200)
 
 @router.post("/extensions/store/purchaseCustomizationItem")
 async def buy_item(request: Request,
-                   db_users: AsyncSession = Depends(get_user_session),
-                   db_sessions: AsyncSession = Depends(get_sessions_session),
+                   db_users: Annotated[AsyncSession, Depends(get_user_session)],
+                   db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
                    redis = Depends(Redis.get_redis)):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -312,13 +315,13 @@ async def buy_item(request: Request,
                 "currency": currency_type,
                 "balance": new_balance,
                 "providerBalances": {},
-                "disabled": False
-            }
+                "disabled": False,
+            },
         ],
         "outfitId": item_id,
         "outfitDefaultCost": [
-            { "currencyId": currency_type, "price": price, "discountPercentage": 0 }
-        ]
+            { "currencyId": currency_type, "price": price, "discountPercentage": 0 },
+        ],
     }
 
     return JSONResponse(content=response, status_code=200)

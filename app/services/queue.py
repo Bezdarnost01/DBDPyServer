@@ -1,11 +1,10 @@
-import time
-import math
 import json
+import math
+import time
 import uuid
-from typing import Literal, Tuple, Optional, Dict, Any, List
+from typing import Any, Literal
 
 from aioredis import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .lobby import LobbyManager
 
@@ -17,7 +16,7 @@ class MatchQueue:
     - Позиция игрока в очереди B учитывает уже открытые лобби и их свободные места.
     """
 
-    LUA_JOIN_NONHOST = r'''
+    LUA_JOIN_NONHOST = r"""
     -- KEYS[1] = lobby:{id}
     -- ARGV[1] = player_json
     -- ARGV[2] = max_survivors (int)
@@ -56,7 +55,7 @@ class MatchQueue:
     table.insert(lobby["nonHosts"], player)
     redis.call("SET", lobby_key, cjson.encode(lobby))
     return 1
-    '''
+    """
 
     def __init__(
         self,
@@ -65,7 +64,7 @@ class MatchQueue:
         lobby_manager: LobbyManager,
         avg_match_seconds: int = 10,
         max_survivors: int = 4,
-    ):
+    ) -> None:
         self.redis = redis
         self.side = side.upper()
         self.key = f"queue:{self.side}"  # Redis list
@@ -80,7 +79,7 @@ class MatchQueue:
         self.key_open_zset = "lobbies:open:z"
 
 
-    async def _decode(self, v) -> Optional[str]:
+    async def _decode(self, v) -> str | None:
         if v is None:
             return None
         if isinstance(v, bytes):
@@ -92,15 +91,13 @@ class MatchQueue:
     async def _llen(self, side: Literal["A", "B"]) -> int:
         return int(await self.redis.llen(f"queue:{side}"))
 
-    async def _sizes(self) -> Tuple[int, int]:
+    async def _sizes(self) -> tuple[int, int]:
         size_a = await self._llen("A")
         size_b = await self._llen("B")
         return size_a, size_b
 
-    async def _register_open_lobby(self, lobby_id: str, created_ts: Optional[float] = None) -> None:
-        """
-        Регистрирует лобби в сетах открытых лобби и в zset (FIFO-порядок по score).
-        """
+    async def _register_open_lobby(self, lobby_id: str, created_ts: float | None = None) -> None:
+        """Регистрирует лобби в сетах открытых лобби и в zset (FIFO-порядок по score)."""
         ts = float(created_ts or time.time())
         pipe = self.redis.pipeline()
         pipe.sadd(self.key_open_set, lobby_id)
@@ -113,23 +110,19 @@ class MatchQueue:
         pipe.zrem(self.key_open_zset, lobby_id)
         await pipe.execute()
 
-    async def _get_open_lobby_ids_fifo(self) -> List[str]:
-        """
-        Возвращает список lobby_id в порядке FIFO (по score).
-        """
+    async def _get_open_lobby_ids_fifo(self) -> list[str]:
+        """Возвращает список lobby_id в порядке FIFO (по score)."""
         ids = await self.redis.zrange(self.key_open_zset, 0, -1)
-        out: List[str] = []
+        out: list[str] = []
         for raw in ids:
             s = await self._decode(raw)
             if s:
                 out.append(s)
         return out
 
-    async def _get_open_lobbies_fifo(self) -> List[Dict[str, Any]]:
-        """
-        Возвращает список лобби (JSON) в FIFO-порядке. Фильтрует мёртвые.
-        """
-        out: List[Dict[str, Any]] = []
+    async def _get_open_lobbies_fifo(self) -> list[dict[str, Any]]:
+        """Возвращает список лобби (JSON) в FIFO-порядке. Фильтрует мёртвые."""
+        out: list[dict[str, Any]] = []
         for lid in await self._get_open_lobby_ids_fifo():
             lobby = await self.lobby_manager.get_lobby_by_id(lid)
             if not lobby:
@@ -141,9 +134,7 @@ class MatchQueue:
         return out
 
     async def _available_b_slots_fifo(self) -> int:
-        """
-        Считает суммарное кол-во свободных слотов B во всех открытых лобби (FIFO).
-        """
+        """Считает суммарное кол-во свободных слотов B во всех открытых лобби (FIFO)."""
         total = 0
         for lobby in await self._get_open_lobbies_fifo():
             nonhosts = lobby.get("nonHosts") or []
@@ -152,10 +143,8 @@ class MatchQueue:
         return total
 
 
-    async def get_queued_player(self, bhvr_session: str) -> Tuple[Optional[dict], int, Optional[str]]:
-        """
-        Ищет игрока в своей очереди по bhvr_session. Возвращает (obj, idx, raw_json)
-        """
+    async def get_queued_player(self, bhvr_session: str) -> tuple[dict | None, int, str | None]:
+        """Ищет игрока в своей очереди по bhvr_session. Возвращает (obj, idx, raw_json)."""
         items = await self.redis.lrange(self.key, 0, -1)
         for idx, raw in enumerate(items):
             raw_str = await self._decode(raw)
@@ -174,15 +163,16 @@ class MatchQueue:
         bhvr_session: str,
         user_id: str,
         side: Literal["A", "B"],
-        last_checked_for_match: Optional[float] = None,
-    ):
+        last_checked_for_match: float | None = None,
+    ) -> None:
         """
         Добавляет игрока в очередь соответствующей стороны.
         Для стороны A: игрок не должен добавляться в очередь B-очереди-экземпляра и наоборот.
         """
         side = side.upper()
         if side != self.side:
-            raise Exception(f"MatchQueue(side={self.side}) cannot accept player of side={side}")
+            msg = f"MatchQueue(side={self.side}) cannot accept player of side={side}"
+            raise Exception(msg)
         if last_checked_for_match is None:
             last_checked_for_match = time.time()
 
@@ -214,7 +204,7 @@ class MatchQueue:
                 "position": position,  # 1-based
                 "sizeA": size_a,
                 "sizeB": size_b,
-                "stable": True
+                "stable": True,
             },
             "status": "QUEUED",
         }
@@ -248,7 +238,7 @@ class MatchQueue:
         Реальная 1-based позиция B-игрока в очереди с учётом свободных мест в уже открытых лобби.
         Пример: 1 лобби (3/4) → свободно 1; в очереди 5 игроков.
             i=0 → матчится (вы это увидите через MATCHED), у остальных позиции 1..4.
-            Формула: max(1, i - free_slots_total + 1)
+            Формула: max(1, i - free_slots_total + 1).
         """
         free_total = await self._available_b_slots_fifo()
         return max(1, index_0based - free_total + 1)
@@ -267,22 +257,20 @@ class MatchQueue:
         return int(batches * self.avg_match_seconds)
 
     async def _eta_for_A(self) -> int:
-        """
-        Примерная оценка ETA для A: сколько B нужно добрать до полного лобби.
-        """
+        """Примерная оценка ETA для A: сколько B нужно добрать до полного лобби."""
         size_a, size_b = await self._sizes()
         # Сколько уже в открытых лобби людей B (сумма nonHosts) нас не интересует для ETA А,
         # здесь грубо считаем, что нужно self.max_survivors B, и их даст очередь B.
         need_b = max(0, self.max_survivors - size_b)
         return int(need_b * self.avg_match_seconds)
-    
-    async def get_stats(self) -> Dict[str, int]:
+
+    async def get_stats(self) -> dict[str, int]:
         """
         Возвращает статистику:
          - openLobbies: кол-во открытых лобби (готовых и не начатых)
          - queueA: длина очереди A
          - queueB: длина очереди B
-         - queuedTotal: суммарная очередь
+         - queuedTotal: суммарная очередь.
         """
         open_lobbies = len(await self._get_open_lobbies_fifo())
         size_a, size_b = await self._sizes()
@@ -292,7 +280,7 @@ class MatchQueue:
             "queue": queue_len,
         }
 
-    async def get_queue_status(self, session: Dict[str, Any]):
+    async def get_queue_status(self, session: dict[str, Any]):
         """
         Основной метод для клиента.
         - Если игрок сматчен → MATCHED + данные матча.
@@ -383,9 +371,7 @@ class MatchQueue:
 
     @staticmethod
     async def create_match_response(lobby_manager: LobbyManager, match_id: str, killed: bool = False):
-        """
-        Возвращает снэпшот матча по match_id.
-        """
+        """Возвращает снэпшот матча по match_id."""
         lobby = await lobby_manager.get_lobby_by_id(match_id)
         if not lobby:
             lobby = await lobby_manager.get_killed_lobby_by_id(match_id)

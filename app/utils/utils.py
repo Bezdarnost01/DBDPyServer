@@ -1,20 +1,26 @@
-import httpx
-import re
-import base64
-import zlib
-import json
 import asyncio
-from Crypto.Cipher import AES
-from pathlib import Path
-from typing import Optional, List
-from typing import Dict
-import random
-from configs.config import EMBLEM_XP, XP_PER_UNIT, CAP, FIRST_MATCH_BONUS, XP_TABLE
+import base64
+import json
 import logging
-logger = logging.getLogger(__name__) 
+import random
+import re
+import zlib
+from pathlib import Path
 
-KEY = b'5BCC2D6A95D4DF04A005504E59A9B36E'
-STEAM_API_KEY = '3DF53DC286EA45499117277D037D87C3'
+import httpx
+from configs.config import (
+    CAP,
+    EMBLEM_XP,
+    FIRST_MATCH_BONUS,
+    XP_PER_UNIT,
+    XP_TABLE,
+)
+from Crypto.Cipher import AES
+
+logger = logging.getLogger(__name__)
+
+KEY = b"5BCC2D6A95D4DF04A005504E59A9B36E"
+STEAM_API_KEY = "3DF53DC286EA45499117277D037D87C3"
 STEAM_API_URL = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
 
 
@@ -22,42 +28,39 @@ class Utils:
     @staticmethod
     async def _decrypt_dbd(encrypted_bytes: bytes) -> str:
         if not encrypted_bytes.startswith(b"DbdDAgAC"):
-            raise ValueError("Неверный формат зашифрованной строки.")
+            msg = "Неверный формат зашифрованной строки."
+            raise ValueError(msg)
         encrypted_body = encrypted_bytes[8:]
         encrypted_body = base64.b64decode(encrypted_body)
         cipher = AES.new(KEY, AES.MODE_ECB)
         decrypted_padded = cipher.decrypt(encrypted_body)
-        decrypted = decrypted_padded.rstrip(b'\x00')
+        decrypted = decrypted_padded.rstrip(b"\x00")
         decrypted = bytes((b + 1) % 256 for b in decrypted)
         decrypted = decrypted[8:]
-        inner_b64_str = decrypted.decode('utf-8', errors='ignore')
-        inner_b64_str = re.sub(r'[^A-Za-z0-9+/=]', '', inner_b64_str)
-        inner_b64_str = inner_b64_str + '=' * (-len(inner_b64_str) % 4)
+        inner_b64_str = decrypted.decode("utf-8", errors="ignore")
+        inner_b64_str = re.sub(r"[^A-Za-z0-9+/=]", "", inner_b64_str)
+        inner_b64_str = inner_b64_str + "=" * (-len(inner_b64_str) % 4)
         inner_data = base64.b64decode(inner_b64_str)
         inner_data = inner_data[4:]
         plain_data = zlib.decompress(inner_data)
-        
+
         try:
             json_str = plain_data.decode("utf-16-le")
         except UnicodeDecodeError:
             try:
                 json_str = plain_data.decode("utf-8")
-            except Exception as e:
-                print("Can't decode as utf-16-le or utf-8:", e)
+            except Exception:
                 raise
 
         start = json_str.find("[")
         end = json_str.rfind("]")
         if start == -1 or end == -1:
-            print("Не удалось найти массив json")
-            print(repr(json_str[:500]))
-            print(repr(json_str[-500:]))
-            raise Exception("json array not found")
-        json_str = json_str[start:end+1]
-        return json_str
+            msg = "json array not found"
+            raise Exception(msg)
+        return json_str[start:end+1]
 
     @staticmethod
-    def token_to_steam_id(token: str) -> Optional[str]:
+    def token_to_steam_id(token: str) -> str | None:
         """
         Преобразует токен (hex-строку) в steam_id.
 
@@ -66,21 +69,20 @@ class Utils:
 
         Returns:
             Optional[str]: Строковое представление steam_id, либо None если ошибка.
+
         """
         if not isinstance(token, str) or len(token) < 40:
             return None
         try:
             data = bytes.fromhex(token)
-            steam_id_int = int.from_bytes(data[12:20], byteorder='little', signed=False)
+            steam_id_int = int.from_bytes(data[12:20], byteorder="little", signed=False)
             return str(steam_id_int)
         except (ValueError, IndexError):
             return None
-    
+
     @staticmethod
-    def xp_to_player_level(total_xp: int, current_level: int) -> Dict[str, int]:
-        """
-        Преобразует общий накопленный XP в состояние уровня/престижа, используя XP_TABLE.
-        """
+    def xp_to_player_level(total_xp: int, current_level: int) -> dict[str, int]:
+        """Преобразует общий накопленный XP в состояние уровня/престижа, используя XP_TABLE."""
         level_version = 34
         prestige = 0
         level = current_level
@@ -106,24 +108,24 @@ class Utils:
             "currentXp": cur_xp,
             "currentXpUpperBound": XP_TABLE.get(level + 1, 4200),
         }
-    
+
     @staticmethod
     def calc_match_xp(
         match_time: int,
         is_first_match: bool,
         player_type: str,
         consecutive_match: float,
-        emblem_qualities: List[str],
-    ) -> Dict[str, int]:
+        emblem_qualities: list[str],
+    ) -> dict[str, int]:
         """
         Считает XP за матч по правилам из конфига:
           - базовый XP = match_time * XP_PER_UNIT, но не больше CAP
           - эмблемы = сумма по EMBLEM_XP (например: None=0, Bronze=0, Silver=6, Gold=12, Iridescent=18)
           - первый матч = FIRST_MATCH_BONUS
-          - итог = (base + emblems + first) * max(1.0, consecutive_match)
+          - итог = (base + emblems + first) * max(1.0, consecutive_match).
         """
         time_xp_raw = match_time * XP_PER_UNIT
-        base_time_xp = min(int(round(time_xp_raw)), CAP)
+        base_time_xp = min(round(time_xp_raw), CAP)
 
         emblems_bonus = sum(EMBLEM_XP.get(e, 0) for e in emblem_qualities)
 
@@ -131,7 +133,7 @@ class Utils:
 
         m = max(1.0, float(consecutive_match))
 
-        gained = int(round((base_time_xp + emblems_bonus + first_bonus) * m))
+        gained = round((base_time_xp + emblems_bonus + first_bonus) * m)
 
         return {
             "baseMatchXp": base_time_xp,
@@ -140,14 +142,14 @@ class Utils:
             "consecutiveMatchMultiplier": m,
             "totalXpGained": gained,
         }
-    
+
     @staticmethod
     def process_xp_gain(
         current_xp: int,
         current_level: int,       # 1..99
         current_prestige: int,    # Devotion
         gained_xp: int,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """
         Перекидывает XP по таблице уровней XP_TABLE:
           - XP_TABLE[n] = сколько нужно XP, чтобы перейти С ТЕКУЩЕГО уровня n-1 на n (или аналогичная ваша семантика).
@@ -158,10 +160,8 @@ class Utils:
         prestige = current_prestige
 
         # Защита от кривых входов
-        if level < 1:
-            level = 1
-        if level > 99:
-            level = 99
+        level = max(level, 1)
+        level = min(level, 99)
 
         # Пока хватает XP на ап
         while True:
@@ -191,7 +191,7 @@ class Utils:
         }
 
     @staticmethod
-    def calc_rewards(old_level: int, new_level: int, old_prestige: int, new_prestige: int) -> List[Dict[str, int]]:
+    def calc_rewards(old_level: int, new_level: int, old_prestige: int, new_prestige: int) -> list[dict[str, int]]:
         """
         Рассчитывает награды игроку за повышение уровня или престижа.
 
@@ -228,23 +228,23 @@ class Utils:
 
     @staticmethod
     async def fetch_names_batch(
-        steam_ids: List[str],
+        steam_ids: list[str],
         *,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: float = 10.0,
         max_retries: int = 3,
         base_backoff: float = 1.0,
         concurrency: int = 3,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         api_key = STEAM_API_KEY
         if not steam_ids:
             return {}
 
-        chunks: List[List[str]] = [steam_ids[i:i+100] for i in range(0, len(steam_ids), 100)]
-        results: Dict[str, str] = {}
+        chunks: list[list[str]] = [steam_ids[i:i+100] for i in range(0, len(steam_ids), 100)]
+        results: dict[str, str] = {}
         sem = asyncio.Semaphore(max(1, concurrency))
 
-        async def fetch_chunk(client: httpx.AsyncClient, chunk: List[str]) -> Dict[str, str]:
+        async def fetch_chunk(client: httpx.AsyncClient, chunk: list[str]) -> dict[str, str]:
             nonlocal api_key
             params = {"key": api_key, "steamids": ",".join(chunk)}
 
@@ -274,7 +274,7 @@ class Utils:
                         players = data.get("response", {}).get("players", [])
                         return {p.get("steamid", ""): p.get("personaname", "") for p in players if p.get("steamid")}
                     except ValueError:
-                        logger.error(f"[Steam] не удалось распарсить JSON. Превью: {text_preview!r}")
+                        logger.exception(f"[Steam] не удалось распарсить JSON. Превью: {text_preview!r}")
                         return {}
                 elif resp.status_code in (429, 500, 502, 503, 504):
                     # Рейт-лимит / временные ошибки — повторяем
@@ -305,9 +305,9 @@ class Utils:
                 results.update(partial)
 
         return results
-        
+
     @staticmethod
-    async def get_item_price(character_name: str = None, outfit_id: str = None, item_id: str = None, currency_id: str = None, redis=None):
+    async def get_item_price(character_name: str | None = None, outfit_id: str | None = None, item_id: str | None = None, currency_id: str | None = None, redis=None):
         from dependency.redis import Redis
         bin_path = Path("../assets/cdn/catalog.bin").resolve()
         data = None
@@ -317,17 +317,16 @@ class Utils:
                 with open(bin_path, "rb") as f:
                     bin_data = f.read()
                 json_str = await Utils._decrypt_dbd(bin_data)
-                json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+                json_str = re.sub(r",(\s*[}\]])", r"\1", json_str)
                 data = json.loads(json_str)
                 await Redis.update_catalog_in_redis(data, redis)
-            else:
-                if not isinstance(data, list):
-                    data = json.loads(data.decode() if isinstance(data, bytes) else data)
+            elif not isinstance(data, list):
+                data = json.loads(data.decode() if isinstance(data, bytes) else data)
         else:
             with open(bin_path, "rb") as f:
                 bin_data = f.read()
             json_str = await Utils._decrypt_dbd(bin_data)
-            json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+            json_str = re.sub(r",(\s*[}\]])", r"\1", json_str)
             data = json.loads(json_str)
 
         if character_name:
@@ -345,7 +344,7 @@ class Utils:
                         prices[part_id] = await Utils.get_item_price(
                             item_id=part_id,
                             currency_id=currency_id,
-                            redis=redis
+                            redis=redis,
                         )
                     return prices if prices else None
 
@@ -357,7 +356,7 @@ class Utils:
                             return cost.get("price")
                     return None
         return None
-    
+
     @staticmethod
     def get_balance(wallet: list, currency: str, default=None):
         rec = next((w for w in wallet if getattr(w, "currency", None) == currency), None)

@@ -1,52 +1,55 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.config import settings
-from db.users import get_user_session
-from db.sessions import get_sessions_session
+import logging
+from typing import Annotated
+
 from crud.sessions import SessionManager
 from crud.users import UserManager
-from utils.utils import Utils
-from utils.users import UserWorker
+from db.sessions import get_sessions_session
+from db.users import get_user_session
 from dependency.redis import Redis
-import logging
-logger = logging.getLogger(__name__) 
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from schemas.config import settings
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils.users import UserWorker
+from utils.utils import Utils
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Users"])
 
 @router.get("/inventories")
 async def get_inventory(request: Request,
-                        db_users: AsyncSession = Depends(get_user_session),
-                        db_sessions: AsyncSession = Depends(get_sessions_session)
+                        db_users: Annotated[AsyncSession, Depends(get_user_session)],
+                        db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     inventory = await UserManager.get_inventory(db_users, user_id=user_id) or []
     inventory_list = []
     for item in inventory:
         inventory_list.append({
             "objectId": item.object_id,
             "quantity": item.quantity,
-            "lastUpdatedAt": item.last_update_at
+            "lastUpdatedAt": item.last_update_at,
         })
     return {
         "code": 200,
         "message": "OK",
         "data": {
-            "inventory": inventory_list
-        }
+            "inventory": inventory_list,
+        },
     }
 
 @router.get("/players/me/states/FullProfile/binary")
 async def get_user_save(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -71,17 +74,17 @@ async def get_user_save(
 
 @router.get("/wallet/currencies/BonusBloodpoints")
 async def get_bonus_bloodpoints(request: Request,
-                        db_users: AsyncSession = Depends(get_user_session),
-                        db_sessions: AsyncSession = Depends(get_sessions_session)
+                        db_users: Annotated[AsyncSession, Depends(get_user_session)],
+                        db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         raise HTTPException(404, detail="User not found")
@@ -94,40 +97,40 @@ async def get_bonus_bloodpoints(request: Request,
     return {
         "userId": user.user_id,
         "balance": balance,
-        "currency": "BonusBloodpoints"
+        "currency": "BonusBloodpoints",
     }
 
 @router.post("/extensions/wallet/getLocalizedCurrenciesAfterLogin")
 async def get_localized_currencies_after_login(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         raise HTTPException(404, detail="User not found")
-    
+
     user_save_stats = await UserWorker.get_stats_from_save(db_users, user_id=user_id)
 
     await UserManager.set_wallet_balance(db_users, user_id=user_id, currency="Bloodpoints", balance=user_save_stats.experience)
 
     wallet = await UserManager.get_wallet(db=db_users, user_id=user_id) or []
     balances = {w.currency: w.balance for w in wallet}
-    
+
     from configs.config import CURRENCIES
 
     result = [
         {
             "balance": balances.get(currency, 0),
-            "currency": currency
+            "currency": currency,
         }
         for currency in CURRENCIES
     ]
@@ -136,8 +139,8 @@ async def get_localized_currencies_after_login(
 @router.get("/wallet/currencies")
 async def get_wallet_currencies(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions=Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions=Depends(get_sessions_session),
 ):
     from configs.config import CURRENCIES
 
@@ -164,7 +167,7 @@ async def get_wallet_currencies(
         value = balances.get(currency, 0)
         wallets_dict.append({
             "balance": value,
-            "currency": currency
+            "currency": currency,
         })
     return {"list": wallets_dict}
 
@@ -176,17 +179,17 @@ async def wallet_withdraw():
 async def get_player_name(
     steam_name: str,
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         raise HTTPException(404, detail="User not found")
@@ -200,28 +203,28 @@ async def get_player_name(
         "providerPlayerNames": {"steam": steam_name},
         "userId": user_id,
         "playerName": player_name,
-        "unchanged": True
+        "unchanged": True,
     }
 
 @router.post("/players/me/states/binary")
 async def push_save_state(
     request: Request,
     version: str,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions = Depends(get_sessions_session),
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if not user:
         raise HTTPException(404, detail="User not found")
-    
+
     body = await request.body()
 
     await UserManager.update_save_data(db=db_users, user_id=user_id, save_data=body)
@@ -230,7 +233,7 @@ async def push_save_state(
         "version": int(version) + 1,
         "stateName": "FullProfile",
         "schemaVersion": 0,
-        "playerId": user_id
+        "playerId": user_id,
     }
 
 @router.post("/extensions/ownedProducts/reportOwnedProducts")
@@ -238,48 +241,48 @@ async def report_owned_products(request: Request):
     return {
         "entitlements": [],
         "consumables": [],
-        "backfilledClientDlc": False
+        "backfilledClientDlc": False,
     }
 
 @router.get("/ranks/pips")
 async def get_ranks_pips(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions = Depends(get_sessions_session),
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(
             status_code=404,
-            detail={"code": 404, "message": "Session not found", "data": {}}
+            detail={"code": 404, "message": "Session not found", "data": {}},
         )
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(
             status_code=404,
-            detail={"code": 404, "message": "Session not found", "data": {}}
+            detail={"code": 404, "message": "Session not found", "data": {}},
         )
     user_profile = await UserManager.get_user_profile(db_users, user_id=user_id)
     if not user_profile:
         raise HTTPException(
             status_code=404,
-            detail={"code": 404, "message": "User not found", "data": {}}
+            detail={"code": 404, "message": "User not found", "data": {}},
         )
-    
+
     return {
         "nextRankResetDate": settings.next_rank_reset_date,
         "pips": {
             "survivorPips": user_profile.survivor_pips or 0,
-            "killerPips": user_profile.killer_pips or 0
+            "killerPips": user_profile.killer_pips or 0,
         },
-        "seasonRefresh": False
+        "seasonRefresh": False,
     }
 
 @router.put("/ranks/pips")
 async def put_ranks_pips(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions = Depends(get_sessions_session),
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -290,7 +293,7 @@ async def put_ranks_pips(
     user_profile = await UserManager.get_user_profile(db_users, user_id=user_id)
     if not user_profile:
         raise HTTPException(404, detail={"code": 404, "message": "User not found", "data": {}})
-    
+
     body = await request.json()
     if body.get("forceReset"):
         user_profile.killer_pips = 0
@@ -306,13 +309,13 @@ async def put_ranks_pips(
 
 @router.get("/players/ban/status")
 async def check_ban(request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session),
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
-    
+
     steam_id = await SessionManager.get_steam_id_by_session(db_sessions, bhvr_session)
     if not steam_id:
         raise HTTPException(status_code=401, detail="Session not found")
@@ -323,14 +326,14 @@ async def check_ban(request: Request,
 
     return {
         "isBanned": bool(getattr(user, "is_banned", False)),
-        "HuliPalish? 0_o": "https://ibb.co/jvr26bXD"
+        "HuliPalish? 0_o": "https://ibb.co/jvr26bXD",
     }
 
 @router.post("/extensions/playerLevels/getPlayerLevel")
 async def get_player_level(
     request: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions = Depends(get_sessions_session),
 ):
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -338,7 +341,7 @@ async def get_player_level(
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
-    
+
     user = await UserManager.get_user(db_users, user_id=user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
@@ -347,8 +350,7 @@ async def get_player_level(
 
     current_level = int(getattr(user_profile, "level", 0))
     current_xp = int(getattr(user_profile, "current_xp", 0))
-    level_object = Utils.xp_to_player_level(current_xp, current_level)
-    return level_object
+    return Utils.xp_to_player_level(current_xp, current_level)
 
 @router.post("/players/ban/decayAndGetDisconnectionPenaltyPoints")
 async def post_penalty_points():
@@ -357,9 +359,9 @@ async def post_penalty_points():
 @router.post("/players/friends/sync")
 async def friends_sync(
     req: Request,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session),
-    redis = Depends(Redis.get_redis)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
+    redis = Depends(Redis.get_redis),
 ):
     bhvr_session = req.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -394,11 +396,11 @@ async def friends_sync(
                 "friendPlayerName": {
                     "userId": friend_cloud_id,
                     "providerPlayerNames": {"steam": pname},
-                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}",
                 },
                 "favorite": False,
                 "mute": False,
-                "isKrakenOnlyFriend": False
+                "isKrakenOnlyFriend": False,
             })
 
     await Redis.set_friends_list(redis, cid, ids, friends, ttl=15)
@@ -409,7 +411,7 @@ async def get_friends(
     user_id: str,
     platform: str = "steam",
     db_users: AsyncSession = Depends(get_user_session),
-    redis = Depends(Redis.get_redis)
+    redis = Depends(Redis.get_redis),
 ):
 
     ids = await Redis.get_friend_ids(redis, user_id)
@@ -434,11 +436,11 @@ async def get_friends(
                 "friendPlayerName": {
                     "userId": friend_cloud_id,
                     "providerPlayerNames": {"steam": pname},
-                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}",
                 },
                 "favorite": False,
                 "mute": False,
-                "isKrakenOnlyFriend": False
+                "isKrakenOnlyFriend": False,
             })
 
     await Redis.set_friends_list(redis, user_id, ids, friends, ttl=15)
@@ -447,9 +449,9 @@ async def get_friends(
 @router.get("/friends/richPresence/{user_id}")
 async def get_friends_rich_presence(
     user_id: str,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session),
-    redis = Depends(Redis.get_redis)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
+    redis = Depends(Redis.get_redis),
 ):
 
     ids = await Redis.get_friend_ids(redis, user_id)
@@ -479,12 +481,12 @@ async def get_friends_rich_presence(
                 "gameVersion": "3.6.0_289644live",
                 "gameSpecificData": {
                     "richPresenceStatus": game_state,
-                    "richPresencePlatform": "steam"
+                    "richPresencePlatform": "steam",
                 },
                 "playerNames": {
                     "userId": friend_cloud_id,
                     "providerPlayerNames": {"steam": pname},
-                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}",
                 },
             })
         else:
@@ -497,8 +499,8 @@ async def get_friends_rich_presence(
                 "playerNames": {
                     "userId": friend_cloud_id,
                     "providerPlayerNames": {"steam": pname},
-                    "playerName": f"{pname}#{friend_cloud_id[:4]}"
-                }
+                    "playerName": f"{pname}#{friend_cloud_id[:4]}",
+                },
             })
 
     return rich_presence

@@ -1,11 +1,12 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
 
 class UserCreate(BaseModel):
     steam_id: int
-    user_id: Optional[str] = None
-    save_data: Optional[str] = None
+    user_id: str | None = None
+    save_data: str | None = None
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -14,16 +15,16 @@ class UserRead(BaseModel):
     user_id: str
     steam_id: int
     created_at: datetime
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     save_data: str
     is_banned: bool
 
     model_config = ConfigDict(from_attributes=True)
 
 class UserProfileBase(BaseModel):
-    user_name: Optional[str] = None
-    user_code: Optional[str] = None
-    user_state: Optional[str] = None
+    user_name: str | None = None
+    user_code: str | None = None
+    user_state: str | None = None
     xp: int = 0
     rank: int = 0
     level: int = 0
@@ -43,7 +44,7 @@ class UserProfileRead(UserProfileBase):
         from_attributes=True
 
 class UserWalletBase(BaseModel):
-    currency: Optional[str] = None
+    currency: str | None = None
     balance: int = 0
 
 class UserWalletCreate(UserWalletBase):
@@ -57,9 +58,9 @@ class UserWalletRead(UserWalletBase):
         from_attributes=True
 
 class UserInventoryBase(BaseModel):
-    object_id: Optional[str] = None
+    object_id: str | None = None
     quantity: int = 1
-    last_update_at: Optional[int] = None
+    last_update_at: int | None = None
 
 class UserInventoryCreate(UserInventoryBase):
     user_id: str
@@ -73,18 +74,18 @@ class UserInventoryRead(UserInventoryBase):
 
 class UserStats(BaseModel):
     experience: int = 0
-    playerUId: Optional[str]
-    selectedCamperIndex: Optional[int]
-    selectedSlasherIndex: Optional[int]
-    firstTimePlaying: Optional[bool]
-    consecutiveMatchStreak: Optional[int]
-    currentSeasonTicks: Optional[int]
-    lastConnectedCharacterIndex: Optional[int]
-    disconnectPenaltyTime: Optional[str]
-    lastMatchEndTime: Optional[str]
-    lastMatchStartTime: Optional[str]
-    lastKillerMatchEndTime: Optional[str]
-    lastSurvivorMatchEndTime: Optional[str]
+    playerUId: str | None
+    selectedCamperIndex: int | None
+    selectedSlasherIndex: int | None
+    firstTimePlaying: bool | None
+    consecutiveMatchStreak: int | None
+    currentSeasonTicks: int | None
+    lastConnectedCharacterIndex: int | None
+    disconnectPenaltyTime: str | None
+    lastMatchEndTime: str | None
+    lastMatchStartTime: str | None
+    lastKillerMatchEndTime: str | None
+    lastSurvivorMatchEndTime: str | None
 
 class SessionBase(BaseModel):
     bhvr_session: str
@@ -97,7 +98,7 @@ class SessionCreate(SessionBase):
 
 class SessionRead(SessionBase):
     id: int
-    created_at: Optional[datetime]
+    created_at: datetime | None
 
     class Config:
         from_attributes=True

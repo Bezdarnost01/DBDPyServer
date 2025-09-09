@@ -1,5 +1,6 @@
+
 from pydantic import BaseModel
-from typing import List
+
 
 class MatchData(BaseModel):
     matchTime: int
@@ -7,6 +8,6 @@ class MatchData(BaseModel):
     isFirstMatch: bool
     consecutiveMatch: int
     playerType: str
-    emblemQualities: List[str]
+    emblemQualities: list[str]
     platformVersion: str
     levelVersion: int

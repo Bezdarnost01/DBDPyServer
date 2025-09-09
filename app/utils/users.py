@@ -1,13 +1,15 @@
+import base64
+import json
 import os
 import uuid
-import json
 import zlib
-import base64
-from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.users import UserStats
-from typing import Any, Optional
-from schemas.config import settings
+from typing import Any
+
 from Crypto.Cipher import AES
+from schemas.config import settings
+from schemas.users import UserStats
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 class UserWorker:
     """
@@ -18,27 +20,21 @@ class UserWorker:
     """
 
     _default_save_path: str = os.path.join("..", "assets", "default_save.json")
-    _cached_default_save: Optional[str] = None
+    _cached_default_save: str | None = None
 
     @staticmethod
     def generate_unique_user_id() -> str:
-        """
-        Генерирует уникальный идентификатор пользователя (UUID4).
-        """
+        """Генерирует уникальный идентификатор пользователя (UUID4)."""
         return str(uuid.uuid4())
 
     @staticmethod
     def compress_for_save(data: str) -> str:
-        """
-        Сжимает строку через zlib и кодирует в base64.
-        """
+        """Сжимает строку через zlib и кодирует в base64."""
         return base64.b64encode(zlib.compress(data.encode("utf-8"))).decode("utf-8")
 
     @staticmethod
     def decompress_from_save(data_b64: str) -> str:
-        """
-        Декодирует строку из base64 и распаковывает из zlib.
-        """
+        """Декодирует строку из base64 и распаковывает из zlib."""
         return zlib.decompress(base64.b64decode(data_b64)).decode("utf-8")
 
 
@@ -46,13 +42,14 @@ class UserWorker:
     def encrypt_save_dbhvr(plain_data: Any) -> str:
         """
         Полностью шифрует сейв по протоколу Dead by Daylight:
-        - JSON-строка -> UTF-16LE -> zlib -> base64 -> AES-256-ECB -> base64 + префиксы
+        - JSON-строка -> UTF-16LE -> zlib -> base64 -> AES-256-ECB -> base64 + префиксы.
 
         Args:
             plain_data (Any): Исходные данные (dict или str).
 
         Returns:
             str: Шифрованная строка, совместимая с клиентом DBD.
+
         """
         if isinstance(plain_data, dict):
             plain_data = json.dumps(plain_data, ensure_ascii=False)
@@ -78,13 +75,14 @@ class UserWorker:
     def decrypt_save_dbhvr(encrypted: str) -> str:
         """
         Дешифрует сейв из протокола Dead by Daylight:
-        - Проверяет префикс, base64, AES-256-ECB, postprocessing, zlib, UTF-16LE
+        - Проверяет префикс, base64, AES-256-ECB, postprocessing, zlib, UTF-16LE.
 
         Args:
             encrypted (str): Зашифрованная строка от клиента игры.
 
         Returns:
             str: Декодированный JSON-сейв (строка).
+
         """
         assert encrypted.startswith("DbdDAgAC"), "Invalid DBD save format!"
         encrypted = encrypted[8:]
@@ -112,70 +110,67 @@ class UserWorker:
 
         Returns:
             bytes: Шифрованный дефолтный сейв (для записи пользователю).
+
         Raises:
             FileNotFoundError: Если файл шаблона не найден.
+
         """
         if cls._cached_default_save is None:
-            with open(cls._default_save_path, encoding='utf-8') as f:
+            with open(cls._default_save_path, encoding="utf-8") as f:
                 data = json.load(f)
             encrypted_str = cls.encrypt_save_dbhvr(data)
             if isinstance(encrypted_str, str):
-                cls._cached_default_save = encrypted_str.encode('utf-8')
+                cls._cached_default_save = encrypted_str.encode("utf-8")
             else:
                 cls._cached_default_save = encrypted_str
         return cls._cached_default_save
-    
+
     @staticmethod
     def save_json_to_encrypted(save_json: dict) -> str:
-        """
-        Превращает json-сейв в зашифрованный DBD-формат.
-        """
+        """Превращает json-сейв в зашифрованный DBD-формат."""
         return UserWorker.encrypt_save_dbhvr(save_json)
 
     @staticmethod
     async def set_user_save(db: AsyncSession, user_id: str, save_json: dict) -> bool:
-        """Установить сейв юзеру"""
-
+        """Установить сейв юзеру."""
         from crud.users import UserManager
 
         user = await UserManager.get_user(db, user_id=user_id)
         if not user:
-            raise Exception("User not found")
-        
+            msg = "User not found"
+            raise Exception(msg)
+
         save_bin = UserWorker.encrypt_save_dbhvr(save_json)
         if isinstance(save_bin, str):
-            save_bin = save_bin.encode('utf-8')
+            save_bin = save_bin.encode("utf-8")
 
         result = await UserManager.update_save_data(db=db, user_id=user_id, save_data=save_bin)
 
         if result:
             return True
+        return None
 
     @staticmethod
     def encrypted_to_json(save_encrypted: str) -> dict:
-        """
-        Превращает зашифрованный сейв DBD в словарь.
-        """
+        """Превращает зашифрованный сейв DBD в словарь."""
         return json.loads(UserWorker.decrypt_save_dbhvr(save_encrypted))
 
     @staticmethod
     async def get_user_json_save(db: AsyncSession, user_id: str) -> dict:
-        """
-        Получить json сейв юзера
-        """
+        """Получить json сейв юзера."""
         from crud.users import UserManager
 
         user = await UserManager.get_user(db, user_id=user_id)
         if not user:
-            raise Exception("User not found")
-        
-        save_dict = UserWorker.encrypted_to_json(user.save_data.decode("utf-8"))
+            msg = "User not found"
+            raise Exception(msg)
 
-        return save_dict
+        return UserWorker.encrypted_to_json(user.save_data.decode("utf-8"))
 
-    
+
+
     @staticmethod
-    async def set_experience_in_save(db: AsyncSession, *, user_id: str = None, steam_id: int = None, new_experience: int):
+    async def set_experience_in_save(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None, new_experience: int) -> bool:
         """
         Устанавливает (обновляет) значение опыта (experience) пользователя в его сейве.
 
@@ -190,11 +185,13 @@ class UserWorker:
 
         Raises:
             Exception: Если пользователь не найден.
+
         """
         from crud.users import UserManager
         user = await UserManager.get_user(db, user_id=user_id, steam_id=steam_id)
         if not user:
-            raise Exception("User not found")
+            msg = "User not found"
+            raise Exception(msg)
         save_dict = UserWorker.encrypted_to_json(user.save_data.decode("utf-8"))
 
         if "experience" in save_dict:
@@ -217,12 +214,12 @@ class UserWorker:
             db,
             user_id=user_id,
             steam_id=steam_id,
-            save_data=encrypted_save.encode("utf-8")
+            save_data=encrypted_save.encode("utf-8"),
         )
         return True
 
     @staticmethod
-    async def get_stats_from_save(db: AsyncSession, *, user_id: str = None, steam_id: int = None) -> dict:
+    async def get_stats_from_save(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None) -> dict:
         """
         Возвращает основную игровую статистику пользователя из его сейва в виде объекта UserStats (Pydantic).
 
@@ -236,11 +233,13 @@ class UserWorker:
 
         Raises:
             Exception: Если пользователь не найден.
+
         """
         from crud.users import UserManager
         user = await UserManager.get_user(db, user_id=user_id, steam_id=steam_id)
         if not user:
-            raise Exception("User not found")
+            msg = "User not found"
+            raise Exception(msg)
         save_dict = UserWorker.encrypted_to_json(user.save_data.decode("utf-8"))
 
         stats = {

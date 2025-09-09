@@ -1,9 +1,18 @@
-from sqlalchemy import Integer, BigInteger, String, Column, DateTime, Boolean, LargeBinary
-from sqlalchemy.orm import relationship
-from db.users import UsersBase
-from utils.users import UserWorker
 from datetime import datetime
+
 import pytz
+from db.users import UsersBase
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    LargeBinary,
+    String,
+)
+from sqlalchemy.orm import relationship
+from utils.users import UserWorker
 
 MOSCOW = pytz.timezone("Europe/Moscow")
 

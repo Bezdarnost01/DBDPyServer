@@ -1,39 +1,39 @@
-import logging
 import asyncio
-import time
+import logging
 import sys
-from fastapi import FastAPI
-import redis.asyncio as redis
+import time
 
+import redis.asyncio as redis
 from api.v1 import routers
+from crud.sessions import SessionManager
+from db.sessions import sessions_sessionmaker
+from fastapi import FastAPI
 from middleware.http_middleware import log_http_request_time
 from models import init_all_databases
 from schemas.config import settings
 from services.lobby import LobbyManager
-from crud.sessions import SessionManager
-from db.sessions import sessions_sessionmaker
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[
         logging.FileHandler("log/log.log", encoding="utf-8"),
-        logging.StreamHandler(sys.stdout)
-    ]
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-async def regular_session_cleanup():
+async def regular_session_cleanup() -> None:
     while True:
         async with sessions_sessionmaker() as db:
             try:
                 await SessionManager.remove_expired_sessions(db)
             except Exception as e:
-                logging.error(f"Error during session cleanup: {e}")
+                logging.exception(f"Error during session cleanup: {e}")
         await asyncio.sleep(settings.cleanup_interval)
 
-async def cleanup_dead_lobbies(redis, lobby_manager, check_interval=20):
+async def cleanup_dead_lobbies(redis, lobby_manager, check_interval=20) -> None:
     while True:
         open_lobbies = await redis.smembers("lobbies:open")
         int(time.time())

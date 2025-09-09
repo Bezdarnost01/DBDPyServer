@@ -1,14 +1,15 @@
-from sqlalchemy import Integer, BigInteger, String, Column, ForeignKey
-from sqlalchemy.orm import relationship
 from db.users import UsersBase
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
 
 class UserProfile(UsersBase):
     __tablename__ = "users_profiles"
-    
+
     id = Column(Integer, primary_key=True)
     user_id = Column(String, ForeignKey("users.user_id"), nullable=False, unique=True, index=True)
     steam_id = Column(BigInteger)
-    
+
     user_name = Column(String, default=None)
     user_code = Column(String, default=None)
     user_state = Column(String, default=None)

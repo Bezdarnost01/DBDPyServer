@@ -1,10 +1,12 @@
 # test.py
-import httpx
-import webbrowser
-import threading
+import contextlib
 import sys
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+import threading
+import webbrowser
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+import httpx
 
 API_BASE = "https://dbdclub.live"   # без завершающего /
 API_PREFIX = "/api/v"               # у тебя так
@@ -18,7 +20,7 @@ LOCAL_REALM = f"http://{HOST}:{PORT}"
 httpd = None  # будет создан ниже
 
 class CallbackHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
+    def do_GET(self) -> None:
         from html import escape
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query, keep_blank_values=True)
@@ -33,19 +35,18 @@ class CallbackHandler(BaseHTTPRequestHandler):
             self.send_response(500)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(f"Ошибка запроса к API: {escape(str(e))}".encode("utf-8"))
+            self.wfile.write(f"Ошибка запроса к API: {escape(str(e))}".encode())
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
 
-        name = data.get("name") or "безымянный"
-        steam_id = data.get("steam_id")
-        user_id = data.get("user_id")
+        data.get("name") or "безымянный"
+        data.get("steam_id")
+        data.get("user_id")
 
-        print(f"\n[OK] Привет, {name}! (steam_id={steam_id}, user_id={user_id})")
 
         threading.Thread(target=self.server.shutdown, daemon=True).start()
 
-    def log_message(self, *args, **kwargs):
+    def log_message(self, *args, **kwargs) -> None:
         return
 
 def build_local_auth_url(auth_url: str) -> str:
@@ -64,7 +65,7 @@ def build_local_auth_url(auth_url: str) -> str:
     new_query = urlencode(qs, doseq=True)
     return urlunparse((parts.scheme, parts.netloc, parts.path, parts.params, new_query, parts.fragment))
 
-def main():
+def main() -> None:
     global httpd
 
     # 1) поднимаем локальный сервер (в отдельном НЕ-daemon потоке)
@@ -79,33 +80,24 @@ def main():
             r = client.get(url)
             r.raise_for_status()
         auth_url = r.json().get("auth_url")
-    except Exception as e:
-        print(f"[ERR] не смог получить launcher-url: {e}")
+    except Exception:
         # выключим сервер, если подняли
-        try:
+        with contextlib.suppress(Exception):
             httpd.shutdown()
-        except Exception:
-            pass
         sys.exit(1)
 
     if not auth_url:
-        print("[ERR] сервер не вернул auth_url")
-        try:
+        with contextlib.suppress(Exception):
             httpd.shutdown()
-        except Exception:
-            pass
         sys.exit(2)
 
     # 3) перестраиваем ссылку под локальный колбэк и realm
     local_auth_url = build_local_auth_url(auth_url)
 
-    print(f"[INFO] Открываю браузер для авторизации...")
-    print(f"[INFO] Жду колбэка по {LOCAL_CB} ...\n")
     webbrowser.open(local_auth_url)
 
     # 4) БЛОКИРУЕМСЯ, пока не придёт колбэк (shutdown в handler)
     t.join()
-    print("\n[INFO] Колбэк получен, выходим.")
 
 if __name__ == "__main__":
     main()

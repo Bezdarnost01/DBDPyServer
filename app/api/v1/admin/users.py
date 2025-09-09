@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Body
-from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.admin import KickUserRequest, BanUserRequest
-from schemas.config import settings
+from typing import Annotated
+
+from crud.sessions import SessionManager
 from crud.users import UserManager
 from crud.websocket import WSManager
-from crud.sessions import SessionManager
-from utils.users import UserWorker
-from db.users import get_user_session
 from db.sessions import get_sessions_session
+from db.users import get_user_session
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from schemas.admin import BanUserRequest, KickUserRequest
+from schemas.config import settings
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils.users import UserWorker
 
 router = APIRouter(prefix=settings.api_admin_prefix, tags=["Admin"])
 
@@ -17,8 +19,8 @@ ws_manager = WSManager()
 async def kick_user(
     request: Request,
     body: KickUserRequest,
-    db_users: AsyncSession = Depends(get_user_session), 
-    db_sessions: AsyncSession = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
@@ -71,8 +73,8 @@ async def kick_user(
 async def ban_user(
     request: Request,
     body: BanUserRequest,
-    db_users: AsyncSession = Depends(get_user_session), 
-    db_sessions: AsyncSession = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
@@ -138,8 +140,8 @@ async def ban_user(
 async def unban_user(
     request: Request,
     body: BanUserRequest,
-    db_users: AsyncSession = Depends(get_user_session),
-    db_sessions: AsyncSession = Depends(get_sessions_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
+    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
     """
     Разбан пользователя (работает и оффлайн, и онлайн).
@@ -153,7 +155,6 @@ async def unban_user(
     Если игрок в онлайне — сессия остаётся активной.
     Если игрок оффлайн — просто снимается флаг бана в БД.
     """
-
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
 
@@ -205,51 +206,48 @@ async def unban_user(
 async def give_bloodpoints(request: Request,
     user_id: str,
     count: int,
-    db_users: AsyncSession = Depends(get_user_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
-    
+
     user = await UserManager.get_user(db=db_users, user_id=user_id)
 
     if not user:
         raise HTTPException(404, "User not found")
-    
-    result = await UserWorker.set_experience_in_save(db=db_users, user_id=user_id, new_experience=count)
 
-    return result
+    return await UserWorker.set_experience_in_save(db=db_users, user_id=user_id, new_experience=count)
+
 
 @router.get("/get_user_save/{user_id}")
 async def get_user_save(request: Request,
     user_id: str,
-    db_users: AsyncSession = Depends(get_user_session)
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
-    
+
     user = await UserManager.get_user(db=db_users, user_id=user_id)
 
     if not user:
         raise HTTPException(404, "User not found")
-    
-    result = await UserWorker.get_user_json_save(db=db_users, user_id=user_id)
 
-    return result
+    return await UserWorker.get_user_json_save(db=db_users, user_id=user_id)
+
 
 @router.put("/set_user_save/{user_id}")
 async def set_user_save(request: Request,
     user_id: str,
-    body: dict = Body(),
-    db_users: AsyncSession = Depends(get_user_session)
+    body: Annotated[dict, Body()],
+    db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
-    
+
     user = await UserManager.get_user(db=db_users, user_id=user_id)
 
     if not user:
         raise HTTPException(404, "User not found")
-    
-    result = await UserWorker.set_user_save(db=db_users, user_id=user_id, save_json=body)
 
-    return result
+    return await UserWorker.set_user_save(db=db_users, user_id=user_id, save_json=body)
+

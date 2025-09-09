@@ -1,7 +1,10 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from schemas.utils import ContentVersionResponse, ValidateChallengeResponse
-from pydantic import BaseModel
 import json
+
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from schemas.utils import ContentVersionResponse, ValidateChallengeResponse
+
 
 class VersionConfig(BaseModel):
     coreVersion: str
@@ -26,7 +29,7 @@ class Settings(BaseSettings):
     @classmethod
     def model_validate_json(cls, value: str):
         return json.loads(value)
-    
+
     @property
     def save_key_bytes(self) -> bytes:
         return self.save_key.encode()

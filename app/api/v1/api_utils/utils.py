@@ -1,8 +1,14 @@
 from pathlib import Path
-from fastapi import APIRouter, Response, Request, status
+
+from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import FileResponse
-from schemas.utils import HealthResponse, ContentVersionResponse, EacChallengeResponse, ClientVersionResponse
-from schemas.config import settings, VersionConfig, ValidateChallengeResponse
+from schemas.config import ValidateChallengeResponse, VersionConfig, settings
+from schemas.utils import (
+    ClientVersionResponse,
+    ContentVersionResponse,
+    EacChallengeResponse,
+    HealthResponse,
+)
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Utils"])
 
@@ -30,7 +36,8 @@ async def validateChallenge():
 async def get_config_file():
     config_path = Path("../assets/config.json").resolve()
     if not config_path.exists():
-        raise RuntimeError(f"File at path {config_path} does not exist.")
+        msg = f"File at path {config_path} does not exist."
+        raise RuntimeError(msg)
     return FileResponse(str(config_path), media_type="application/json")
 
 @router.post("/clientVersion/check", response_model=ClientVersionResponse)
@@ -41,30 +48,29 @@ async def client_version_check():
 async def get_available_bundles():
     config_path = Path("../assets/bundles.json").resolve()
     if not config_path.exists():
-        raise RuntimeError(f"File at path {config_path} does not exist.")
+        msg = f"File at path {config_path} does not exist."
+        raise RuntimeError(msg)
     return FileResponse(str(config_path), media_type="application/json")
 
 @router.post("/extensions/wallet/needMigration")
 async def need_migration(request: Request):
     try:
         body = await request.json()
-        data = body["data"]
-        return data
+        return body["data"]
     except Exception:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
 @router.post("/extensions/wallet/migrateCurrencies")
 async def migrate_currencies(request: Request):
     try:
         body = await request.json()
         currency_list = body["data"]["list"]
-        response = {
+        return {
             "migrationStatus": True,
             "list": [
                 {"migrated": True, "currency": c["currency"], "reason": "NONE"}
                 for c in currency_list
-            ]
+            ],
         }
-        return response
     except Exception:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
