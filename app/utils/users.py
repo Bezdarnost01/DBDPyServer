@@ -12,44 +12,57 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class UserWorker:
-    """
-    Утилитный класс для работы с пользовательскими сейвами Dead by Daylight:
-    - Полное шифрование/дешифрование по протоколу игры.
-    - Конвертация между строкой и JSON.
-    - Получение дефолтного сейва из файла.
-    """
+    """Класс `UserWorker` описывает структуру приложения."""
 
     _default_save_path: str = os.path.join("..", "assets", "default_save.json")
     _cached_default_save: str | None = None
 
     @staticmethod
     def generate_unique_user_id() -> str:
-        """Генерирует уникальный идентификатор пользователя (UUID4)."""
+        """Функция `generate_unique_user_id` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            Отсутствуют.
+        
+        Возвращает:
+            str: Результат выполнения функции.
+        """
         return str(uuid.uuid4())
 
     @staticmethod
     def compress_for_save(data: str) -> str:
-        """Сжимает строку через zlib и кодирует в base64."""
+        """Функция `compress_for_save` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            data (str): Структура данных.
+        
+        Возвращает:
+            str: Результат выполнения функции.
+        """
         return base64.b64encode(zlib.compress(data.encode("utf-8"))).decode("utf-8")
 
     @staticmethod
     def decompress_from_save(data_b64: str) -> str:
-        """Декодирует строку из base64 и распаковывает из zlib."""
+        """Функция `decompress_from_save` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            data_b64 (str): Структура данных.
+        
+        Возвращает:
+            str: Результат выполнения функции.
+        """
         return zlib.decompress(base64.b64decode(data_b64)).decode("utf-8")
 
 
     @staticmethod
     def encrypt_save_dbhvr(plain_data: Any) -> str:
-        """
-        Полностью шифрует сейв по протоколу Dead by Daylight:
-        - JSON-строка -> UTF-16LE -> zlib -> base64 -> AES-256-ECB -> base64 + префиксы.
-
-        Args:
-            plain_data (Any): Исходные данные (dict или str).
-
-        Returns:
-            str: Шифрованная строка, совместимая с клиентом DBD.
-
+        """Функция `encrypt_save_dbhvr` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            plain_data (Any): Структура данных.
+        
+        Возвращает:
+            str: Результат выполнения функции.
         """
         if isinstance(plain_data, dict):
             plain_data = json.dumps(plain_data, ensure_ascii=False)
@@ -73,16 +86,13 @@ class UserWorker:
 
     @staticmethod
     def decrypt_save_dbhvr(encrypted: str) -> str:
-        """
-        Дешифрует сейв из протокола Dead by Daylight:
-        - Проверяет префикс, base64, AES-256-ECB, postprocessing, zlib, UTF-16LE.
-
-        Args:
-            encrypted (str): Зашифрованная строка от клиента игры.
-
-        Returns:
-            str: Декодированный JSON-сейв (строка).
-
+        """Функция `decrypt_save_dbhvr` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            encrypted (str): Параметр `encrypted`.
+        
+        Возвращает:
+            str: Результат выполнения функции.
         """
         assert encrypted.startswith("DbdDAgAC"), "Invalid DBD save format!"
         encrypted = encrypted[8:]
@@ -104,16 +114,13 @@ class UserWorker:
 
     @classmethod
     def get_default_save(cls) -> bytes:
-        """
-        Загружает и возвращает дефолтный сейв в виде шифрованных байтов для DBD.
-        Кэширует результат в памяти (читает файл только при первом вызове).
-
-        Returns:
-            bytes: Шифрованный дефолтный сейв (для записи пользователю).
-
-        Raises:
-            FileNotFoundError: Если файл шаблона не найден.
-
+        """Функция `get_default_save` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            cls (Any): Класс, к которому привязан метод.
+        
+        Возвращает:
+            bytes: Результат выполнения функции.
         """
         if cls._cached_default_save is None:
             with open(cls._default_save_path, encoding="utf-8") as f:
@@ -127,12 +134,28 @@ class UserWorker:
 
     @staticmethod
     def save_json_to_encrypted(save_json: dict) -> str:
-        """Превращает json-сейв в зашифрованный DBD-формат."""
+        """Функция `save_json_to_encrypted` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            save_json (dict): Параметр `save_json`.
+        
+        Возвращает:
+            str: Результат выполнения функции.
+        """
         return UserWorker.encrypt_save_dbhvr(save_json)
 
     @staticmethod
     async def set_user_save(db: AsyncSession, user_id: str, save_json: dict) -> bool:
-        """Установить сейв юзеру."""
+        """Функция `set_user_save` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+            save_json (dict): Параметр `save_json`.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
+        """
         from crud.users import UserManager
 
         user = await UserManager.get_user(db, user_id=user_id)
@@ -152,12 +175,27 @@ class UserWorker:
 
     @staticmethod
     def encrypted_to_json(save_encrypted: str) -> dict:
-        """Превращает зашифрованный сейв DBD в словарь."""
+        """Функция `encrypted_to_json` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            save_encrypted (str): Параметр `save_encrypted`.
+        
+        Возвращает:
+            dict: Результат выполнения функции.
+        """
         return json.loads(UserWorker.decrypt_save_dbhvr(save_encrypted))
 
     @staticmethod
     async def get_user_json_save(db: AsyncSession, user_id: str) -> dict:
-        """Получить json сейв юзера."""
+        """Функция `get_user_json_save` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+        
+        Возвращает:
+            dict: Результат выполнения функции.
+        """
         from crud.users import UserManager
 
         user = await UserManager.get_user(db, user_id=user_id)
@@ -171,21 +209,16 @@ class UserWorker:
 
     @staticmethod
     async def set_experience_in_save(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None, new_experience: int) -> bool:
-        """
-        Устанавливает (обновляет) значение опыта (experience) пользователя в его сейве.
-
-        Args:
-            db (AsyncSession): Сессия базы данных.
-            user_id (str, optional): UUID пользователя (cloud_id). Необязателен, если есть steam_id.
-            steam_id (int, optional): Steam ID пользователя. Необязателен, если есть user_id.
-            new_experience (int): Новое значение опыта (experience) для пользователя.
-
-        Returns:
-            bool: True, если обновление прошло успешно, иначе Exception.
-
-        Raises:
-            Exception: Если пользователь не найден.
-
+        """Функция `set_experience_in_save` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+            new_experience (int): Параметр `new_experience`.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
         """
         from crud.users import UserManager
         user = await UserManager.get_user(db, user_id=user_id, steam_id=steam_id)
@@ -220,20 +253,15 @@ class UserWorker:
 
     @staticmethod
     async def get_stats_from_save(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None) -> dict:
-        """
-        Возвращает основную игровую статистику пользователя из его сейва в виде объекта UserStats (Pydantic).
-
-        Args:
-            db (AsyncSession): Сессия базы данных.
-            user_id (str, optional): UUID пользователя (cloud_id).
-            steam_id (int, optional): Steam ID пользователя.
-
-        Returns:
-            UserStats: Pydantic-модель с ключевой статистикой игрока.
-
-        Raises:
-            Exception: Если пользователь не найден.
-
+        """Функция `get_stats_from_save` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+        
+        Возвращает:
+            dict: Результат выполнения функции.
         """
         from crud.users import UserManager
         user = await UserManager.get_user(db, user_id=user_id, steam_id=steam_id)

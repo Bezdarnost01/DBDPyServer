@@ -4,6 +4,8 @@ from sqlalchemy.orm import relationship
 
 
 class UserProfile(UsersBase):
+    """Класс `UserProfile` наследуется от UsersBase и описывает структуру приложения."""
+
     __tablename__ = "users_profiles"
 
     id = Column(Integer, primary_key=True)

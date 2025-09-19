@@ -17,6 +17,8 @@ from utils.users import UserWorker
 MOSCOW = pytz.timezone("Europe/Moscow")
 
 class Users(UsersBase):
+    """Класс `Users` наследуется от UsersBase и описывает структуру приложения."""
+
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     user_id = Column(String, default=UserWorker.generate_unique_user_id, index=True)

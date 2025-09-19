@@ -8,23 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 MOSCOW = pytz.timezone("Europe/Moscow")
 
 class SessionManager:
-    """Менеджер для работы сессиями пользователей."""
+    """Класс `SessionManager` описывает структуру приложения."""
 
     @staticmethod
     async def create_session(db: AsyncSession, bhvr_session: str, user_id: str, steam_id: int, expires: int) -> Sessions:
-        """
-        Создаёт новую сессию пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            bhvr_session (str): Строка идентификатора сессии.
-            user_id (str): user_id Пользователя
-            steam_id (int): Steam ID пользователя.
-            expires (int): Время истечения сессии (UNIX timestamp).
-
-        Returns:
-            Sessions: Созданная сессия.
-
+        """Функция `create_session` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            bhvr_session (str): Объект сессии.
+            user_id (str): Идентификатор пользователя.
+            steam_id (int): Идентификатор steam.
+            expires (int): Параметр `expires`.
+        
+        Возвращает:
+            Sessions: Результат выполнения функции.
         """
         await db.execute(delete(Sessions).where(Sessions.steam_id == steam_id))
         await db.commit()
@@ -43,16 +41,15 @@ class SessionManager:
 
     @staticmethod
     async def delete_session(db: AsyncSession, bhvr_session: str | None = None, user_id: str | None = None) -> int | None:
-        """
-        Удаляет сессию по её bhvr_session.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            bhvr_session (str): Идентификатор сессии.
-
-        Returns:
-            int: Количество удалённых строк.
-
+        """Функция `delete_session` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            bhvr_session (str | None): Объект сессии. Значение по умолчанию: None.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+        
+        Возвращает:
+            int | None: Результат выполнения функции.
         """
         if bhvr_session:
             exists_stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
@@ -82,17 +79,15 @@ class SessionManager:
 
     @staticmethod
     async def extend_session(db: AsyncSession, bhvr_session: str, extend_seconds: int) -> bool:
-        """
-        Продлевает жизнь сессии на N секунд от текущего времени.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            bhvr_session (str): Идентификатор сессии.
-            extend_seconds (int): Сколько секунд добавить.
-
-        Returns:
-            bool: True если успешно, иначе False.
-
+        """Функция `extend_session` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            bhvr_session (str): Объект сессии.
+            extend_seconds (int): Параметр `extend_seconds`.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
         """
         now = int(datetime.now(MOSCOW).timestamp())
         new_expire = now + extend_seconds
@@ -108,16 +103,14 @@ class SessionManager:
 
     @staticmethod
     async def get_steam_id_by_session(db: AsyncSession, bhvr_session: str) -> int | None:
-        """
-        Получает steam_id по bhvr_session.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            bhvr_session (str): Идентификатор сессии.
-
-        Returns:
-            int | None: Steam ID или None если не найдено.
-
+        """Функция `get_steam_id_by_session` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            bhvr_session (str): Объект сессии.
+        
+        Возвращает:
+            int | None: Результат выполнения функции.
         """
         stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
         result = await db.execute(stmt)
@@ -126,16 +119,14 @@ class SessionManager:
 
     @staticmethod
     async def get_user_id_by_session(db: AsyncSession, bhvr_session: str) -> str | None:
-        """
-        Получает user_id по bhvr_session.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            bhvr_session (str): Идентификатор сессии.
-
-        Returns:
-            str | None: User ID или None если не найдено.
-
+        """Функция `get_user_id_by_session` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            bhvr_session (str): Объект сессии.
+        
+        Возвращает:
+            str | None: Результат выполнения функции.
         """
         stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
         result = await db.execute(stmt)
@@ -144,16 +135,14 @@ class SessionManager:
 
     @staticmethod
     async def get_user_session_by_user_id(db: AsyncSession, user_id: str) -> Sessions | None:
-        """
-        Получает обьект session по user_id.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            bhvr_session (str): Идентификатор сессии.
-
-        Returns:
-            str | None: session или None если не найдено.
-
+        """Функция `get_user_session_by_user_id` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+        
+        Возвращает:
+            Sessions | None: Результат выполнения функции.
         """
         stmt = select(Sessions).where(Sessions.user_id == user_id)
         result = await db.execute(stmt)
@@ -162,18 +151,16 @@ class SessionManager:
 
     @staticmethod
     async def refresh_session_if_needed(db: AsyncSession, bhvr_session: str, threshold: int = 15 * 60, extend_seconds: int = 40 * 60) -> bool:
-        """
-        Продлевает сессию, если до истечения осталось меньше threshold секунд.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            bhvr_session (str): Идентификатор сессии.
-            threshold (int): Порог в секундах, по достижении которого продлеваем.
-            extend_seconds (int): На сколько продлевать.
-
-        Returns:
-            bool: True если продлили, False если не было необходимости или не найдено.
-
+        """Функция `refresh_session_if_needed` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            bhvr_session (str): Объект сессии.
+            threshold (int): Параметр `threshold`. Значение по умолчанию: 15 * 60.
+            extend_seconds (int): Параметр `extend_seconds`. Значение по умолчанию: 40 * 60.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
         """
         stmt = select(Sessions).where(Sessions.bhvr_session == bhvr_session)
         result = await db.execute(stmt)
@@ -188,15 +175,13 @@ class SessionManager:
 
     @staticmethod
     async def remove_expired_sessions(db: AsyncSession) -> int:
-        """
-        Удаляет все сессии, срок которых истёк.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-
-        Returns:
-            int: Количество удалённых сессий.
-
+        """Функция `remove_expired_sessions` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+        
+        Возвращает:
+            int: Результат выполнения функции.
         """
         now = int(datetime.now(MOSCOW).timestamp())
         stmt = delete(Sessions).where(Sessions.expires < now)
@@ -206,15 +191,13 @@ class SessionManager:
 
     @staticmethod
     async def get_sessions_count(db: AsyncSession) -> int:
-        """
-        Получает текущее количество онлайн сессий.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-
-        Returns:
-            int: Количество сессий.
-
+        """Функция `get_sessions_count` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+        
+        Возвращает:
+            int: Результат выполнения функции.
         """
         now = int(datetime.now(MOSCOW).timestamp())
         stmt = select(func.count()).select_from(Sessions).where(Sessions.expires > now)
@@ -222,6 +205,13 @@ class SessionManager:
         return result.scalar_one()
 
     async def get_all_online_user_ids(self: AsyncSession) -> set[str]:
-        """Возвращает set user_id всех пользователей с активной сессией."""
+        """Функция `get_all_online_user_ids` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (AsyncSession): Текущий экземпляр класса.
+        
+        Возвращает:
+            set[str]: Результат выполнения функции.
+        """
         result = await self.execute(select(Sessions.user_id))
         return set(result.scalars().all())

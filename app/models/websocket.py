@@ -7,6 +7,8 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, String
 MOSCOW = pytz.timezone("Europe/Moscow")
 
 class WebsocketSession(SessionsBase):
+    """Класс `WebsocketSession` наследуется от SessionsBase и описывает структуру приложения."""
+
     __tablename__ = "websocket_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

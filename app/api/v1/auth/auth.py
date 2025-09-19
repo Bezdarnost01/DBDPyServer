@@ -20,18 +20,42 @@ STEAM_OPENID_ENDPOINT = "https://steamcommunity.com/openid/login"
 STEAM_ID_RE = re.compile(r"https?://steamcommunity\.com/openid/id/(\d+)")
 BASE_URL = "https://dbdclub.live"
 
+
 def _return_to() -> str:
+    """Функция `_return_to` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        str: Результат выполнения функции.
+    """
+
     return f"{BASE_URL}{settings.api_prefix}/auth/provider/steam/launcher-callback"
 
+
 def _realm() -> str:
+    """Функция `_realm` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        str: Результат выполнения функции.
+    """
+
     return BASE_URL
 
 STEAM_XML_PROFILE = "https://steamcommunity.com/profiles/{steam_id}/?xml=1"
 
 async def fetch_profile(steam_id: str) -> tuple[str | None, str | None]:
-    """
-    Пытаемся сначала через WebAPI (если ключ ок), если 403/ошибка — падаем в XML-фолбэк.
-    Возвращает (name, avatar) или (None, None).
+    """Функция `fetch_profile` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        steam_id (str): Идентификатор steam.
+    
+    Возвращает:
+        tuple[str | None, str | None]: Результат выполнения функции.
     """
     # 1) WebAPI
     api_key = (
@@ -87,6 +111,15 @@ async def fetch_profile(steam_id: str) -> tuple[str | None, str | None]:
 
 @router.get("/auth/provider/steam/launcher-url")
 async def launcher_login_url():
+    """Функция `launcher_login_url` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     params = {
         "openid.ns": "http://specs.openid.net/auth/2.0",
         "openid.mode": "checkid_setup",
@@ -102,6 +135,16 @@ async def launcher_callback(
     request: Request,
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
+    """Функция `launcher_callback` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     qp = dict(request.query_params)
     if not qp:
         raise HTTPException(status_code=400, detail="No OpenID params")

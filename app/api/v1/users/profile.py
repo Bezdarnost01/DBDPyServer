@@ -16,11 +16,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Users"])
 
-@router.get("/inventories")
-async def get_inventory(request: Request,
-                        db_users: Annotated[AsyncSession, Depends(get_user_session)],
-                        db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
-):
+
+async def _require_user_id(
+    request: Request,
+    db_sessions: AsyncSession,
+) -> str:
+    """Функция `_require_user_id` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_sessions (AsyncSession): Объект сессии.
+    
+    Возвращает:
+        str: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -28,6 +38,76 @@ async def get_inventory(request: Request,
     user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
+
+    return user_id
+
+
+async def _require_user(
+    request: Request,
+    db_users: AsyncSession,
+    db_sessions: AsyncSession,
+):
+    """Функция `_require_user` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (AsyncSession): Подключение к базе данных.
+        db_sessions (AsyncSession): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    user_id = await _require_user_id(request, db_sessions)
+    user = await UserManager.get_user(db_users, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user_id, user
+
+
+async def _require_profile(
+    request: Request,
+    db_users: AsyncSession,
+    db_sessions: AsyncSession,
+):
+    """Функция `_require_profile` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (AsyncSession): Подключение к базе данных.
+        db_sessions (AsyncSession): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    user_id = await _require_user_id(request, db_sessions)
+    profile = await UserManager.get_user_profile(db_users, user_id=user_id)
+    if not profile:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": 404, "message": "User not found", "data": {}},
+        )
+    return user_id, profile
+
+
+@router.get("/inventories")
+async def get_inventory(request: Request,
+                        db_users: Annotated[AsyncSession, Depends(get_user_session)],
+                        db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
+):
+    """Функция `get_inventory` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    user_id = await _require_user_id(request, db_sessions)
 
     inventory = await UserManager.get_inventory(db_users, user_id=user_id) or []
     inventory_list = []
@@ -51,17 +131,18 @@ async def get_user_save(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(status_code=401, detail="No session cookie")
+    """Функция `get_user_save` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    _user_id, user = await _require_user(request, db_users, db_sessions)
 
     return Response(
         content=user.save_data,
@@ -77,17 +158,18 @@ async def get_bonus_bloodpoints(request: Request,
                         db_users: Annotated[AsyncSession, Depends(get_user_session)],
                         db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(status_code=401, detail="No session cookie")
+    """Функция `get_bonus_bloodpoints` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
-        raise HTTPException(404, detail="User not found")
+    user_id, user = await _require_user(request, db_users, db_sessions)
 
     if user.is_first_login:
         balance = settings.bonus_bloodpoints
@@ -106,17 +188,18 @@ async def get_localized_currencies_after_login(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(status_code=401, detail="No session cookie")
+    """Функция `get_localized_currencies_after_login` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
-        raise HTTPException(404, detail="User not found")
+    user_id, _user = await _require_user(request, db_users, db_sessions)
 
     user_save_stats = await UserWorker.get_stats_from_save(db_users, user_id=user_id)
 
@@ -142,6 +225,17 @@ async def get_wallet_currencies(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions=Depends(get_sessions_session),
 ):
+    """Функция `get_wallet_currencies` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Any): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     from configs.config import CURRENCIES
 
     bhvr_session = request.cookies.get("bhvrSession")
@@ -173,7 +267,16 @@ async def get_wallet_currencies(
 
 @router.post("/wallet/withdraw")
 async def wallet_withdraw():
-        return {"ok": True}
+    """Функция `wallet_withdraw` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    return {"ok": True}
 
 @router.post("/playername/steam/{steam_name}")
 async def get_player_name(
@@ -182,17 +285,19 @@ async def get_player_name(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(status_code=401, detail="No session cookie")
+    """Функция `get_player_name` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        steam_name (str): Параметр `steam_name`.
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
-        raise HTTPException(404, detail="User not found")
+    user_id, user = await _require_user(request, db_users, db_sessions)
 
     tag = str(user_id).split("-")[0][:4]
     player_name = f"{steam_name}#{tag}"
@@ -213,17 +318,19 @@ async def push_save_state(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions = Depends(get_sessions_session),
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(status_code=401, detail="No session cookie")
+    """Функция `push_save_state` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        version (str): Параметр `version`.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Any): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if not user:
-        raise HTTPException(404, detail="User not found")
+    user_id, user = await _require_user(request, db_users, db_sessions)
 
     body = await request.body()
 
@@ -238,6 +345,15 @@ async def push_save_state(
 
 @router.post("/extensions/ownedProducts/reportOwnedProducts")
 async def report_owned_products(request: Request):
+    """Функция `report_owned_products` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     return {
         "entitlements": [],
         "consumables": [],
@@ -250,24 +366,18 @@ async def get_ranks_pips(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions = Depends(get_sessions_session),
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": 404, "message": "Session not found", "data": {}},
-        )
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": 404, "message": "Session not found", "data": {}},
-        )
-    user_profile = await UserManager.get_user_profile(db_users, user_id=user_id)
-    if not user_profile:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": 404, "message": "User not found", "data": {}},
-        )
+    """Функция `get_ranks_pips` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Any): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    _user_id, user_profile = await _require_profile(request, db_users, db_sessions)
 
     return {
         "nextRankResetDate": settings.next_rank_reset_date,
@@ -284,15 +394,18 @@ async def put_ranks_pips(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions = Depends(get_sessions_session),
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(404, detail={"code": 404, "message": "Session not found", "data": {}})
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(404, detail={"code": 404, "message": "Session not found", "data": {}})
-    user_profile = await UserManager.get_user_profile(db_users, user_id=user_id)
-    if not user_profile:
-        raise HTTPException(404, detail={"code": 404, "message": "User not found", "data": {}})
+    """Функция `put_ranks_pips` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Any): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    _user_id, user_profile = await _require_profile(request, db_users, db_sessions)
 
     body = await request.json()
     if body.get("forceReset"):
@@ -312,6 +425,17 @@ async def check_ban(request: Request,
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
+    """Функция `check_ban` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -335,16 +459,18 @@ async def get_player_level(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions = Depends(get_sessions_session),
 ):
-    bhvr_session = request.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(status_code=401, detail="No session cookie")
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Session not found")
+    """Функция `get_player_level` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Any): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
-    user = await UserManager.get_user(db_users, user_id=user_id)
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
+    user_id, _user = await _require_user(request, db_users, db_sessions)
 
     user_profile = await UserManager.get_user_profile(db=db_users, user_id=user_id)
 
@@ -354,7 +480,16 @@ async def get_player_level(
 
 @router.post("/players/ban/decayAndGetDisconnectionPenaltyPoints")
 async def post_penalty_points():
-    return {"penaltyPoints":0}
+    """Функция `post_penalty_points` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    return {"penaltyPoints": 0}
 
 @router.post("/players/friends/sync")
 async def friends_sync(
@@ -363,12 +498,19 @@ async def friends_sync(
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
     redis = Depends(Redis.get_redis),
 ):
-    bhvr_session = req.cookies.get("bhvrSession")
-    if not bhvr_session:
-        raise HTTPException(status_code=401, detail="No session cookie")
-    user_id = await SessionManager.get_user_id_by_session(db_sessions, bhvr_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Session not found")
+    """Функция `friends_sync` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        req (Request): Параметр `req`.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
+    user_id = await _require_user_id(req, db_sessions)
 
     body = await req.json()
     ids = body.get("ids", [])
@@ -413,6 +555,17 @@ async def get_friends(
     db_users: AsyncSession = Depends(get_user_session),
     redis = Depends(Redis.get_redis),
 ):
+    """Функция `get_friends` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        user_id (str): Идентификатор пользователя.
+        platform (str): Параметр `platform`. Значение по умолчанию: "steam".
+        db_users (AsyncSession): Подключение к базе данных. Значение по умолчанию: Depends(get_user_session).
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
     ids = await Redis.get_friend_ids(redis, user_id)
 
@@ -453,6 +606,17 @@ async def get_friends_rich_presence(
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
     redis = Depends(Redis.get_redis),
 ):
+    """Функция `get_friends_rich_presence` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        user_id (str): Идентификатор пользователя.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
 
     ids = await Redis.get_friend_ids(redis, user_id)
     if not ids:

@@ -4,6 +4,8 @@ from sqlalchemy.orm import relationship
 
 
 class UserWallet(UsersBase):
+    """Класс `UserWallet` наследуется от UsersBase и описывает структуру приложения."""
+
     __tablename__ = "user_wallet"
     id = Column(Integer, primary_key=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)

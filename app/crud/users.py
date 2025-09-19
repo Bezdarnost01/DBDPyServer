@@ -12,18 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 MOSCOW = pytz.timezone("Europe/Moscow")
 
 class UserManager:
+    """Класс `UserManager` описывает структуру приложения."""
+
     @staticmethod
     async def create_user(db: AsyncSession, user_in: UserCreate) -> DBUser | None:
-        """
-        Добавляет пользователя в базу данных.
-
-        Args:
-            db (AsyncSession): Асинхронная сессия SQLAlchemy.
-            user_in (UserCreate): Данные для создания пользователя.
-
-        Returns:
-            DBUser | None: Созданный пользователь или None, если steam_id уже существует.
-
+        """Функция `create_user` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_in (UserCreate): Параметр `user_in`.
+        
+        Возвращает:
+            DBUser | None: Результат выполнения функции.
         """
         result = await db.execute(select(DBUser).where(DBUser.steam_id == user_in.steam_id))
         if result.scalar_one_or_none():
@@ -49,17 +49,15 @@ class UserManager:
 
     @staticmethod
     async def get_user(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None) -> DBUser | None:
-        """
-        Получение объекта пользователя из базы данных по user_id или steam_id.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str, optional): ID пользователя.
-            steam_id (int, optional): Steam ID пользователя.
-
-        Returns:
-            DBUser | None: Найденный пользователь или None.
-
+        """Функция `get_user` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+        
+        Возвращает:
+            DBUser | None: Результат выполнения функции.
         """
         if not user_id and not steam_id:
             msg = "Необходимо передать хотя бы user_id или steam_id"
@@ -76,25 +74,15 @@ class UserManager:
 
     @staticmethod
     async def get_user_profile(db: AsyncSession, user_id: str| None = None, steam_id: int | None = None) -> UserProfile | None:
-        """
-        Получает профиль пользователя по user_id.
-
-        Args:
-            db (AsyncSession): Асинхронная сессия SQLAlchemy.
-            user_id (str | None): Уникальный идентификатор пользователя.
-            steam_id (int | None): Стим айди пользователя.
-
-        Returns:
-            UserProfile | None: Объект профиля пользователя, если найден, иначе None.
-
-        Пример использования:
-        ---------------------
-        profile = await UserManager.get_user_profile(db, user_id="abc123")
-        if profile:
-            print(profile.user_name, profile.xp)
-        else:
-            print("Профиль не найден")
-
+        """Функция `get_user_profile` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str| None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+        
+        Возвращает:
+            UserProfile | None: Результат выполнения функции.
         """
         if user_id:
             stmt = select(UserProfile).where(UserProfile.user_id == user_id)
@@ -112,24 +100,14 @@ class UserManager:
 
     @staticmethod
     async def get_user_profile_by_name(db: AsyncSession, user_name: str) -> UserProfile | None:
-        """
-        Получает профиль пользователя по user_name.
-
-        Args:
-            db (AsyncSession): Асинхронная сессия SQLAlchemy.
-            user_id (str): Имя пользователя.
-
-        Returns:
-            UserProfile | None: Объект профиля пользователя, если найден, иначе None.
-
-        Пример использования:
-        ---------------------
-        profile = await UserManager.get_user_profile(db, user_id="abc123")
-        if profile:
-            print(profile.user_name, profile.xp)
-        else:
-            print("Профиль не найден")
-
+        """Функция `get_user_profile_by_name` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_name (str): Параметр `user_name`.
+        
+        Возвращает:
+            UserProfile | None: Результат выполнения функции.
         """
         stmt = select(UserProfile).where(UserProfile.user_name == user_name)
         result = await db.execute(stmt)
@@ -137,31 +115,15 @@ class UserManager:
 
     @staticmethod
     async def update_user_profile(db: AsyncSession, user_id: str, **fields) -> UserProfile | None:
-        """
-        Обновляет поля профиля пользователя по user_id.
-
-        Args:
-            db (AsyncSession): Асинхронная сессия SQLAlchemy.
-            user_id (str): Уникальный идентификатор пользователя.
-            **fields: Произвольные поля для обновления (например, xp=1000, user_name="NewName").
-
-        Returns:
-            UserProfile | None: Обновлённый профиль пользователя, если найден, иначе None.
-
-        Пример использования:
-        ---------------------
-        profile = await UserManager.update_user_profile(
-            db,
-            user_id="abc123",
-            xp=2000,
-            user_name="AwesomePlayer",
-            rank=5
-        )
-        if profile:
-            print("Профиль обновлён:", profile.user_name, profile.xp)
-        else:
-            print("Профиль не найден")
-
+        """Функция `update_user_profile` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+            **fields (Any): Дополнительные именованные аргументы.
+        
+        Возвращает:
+            UserProfile | None: Результат выполнения функции.
         """
         profile = await UserManager.get_user_profile(db, user_id=user_id)
         if not profile:
@@ -174,18 +136,16 @@ class UserManager:
 
     @staticmethod
     async def update_save_data(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None, save_data: bytes) -> DBUser | None:
-        """
-        Обновляет сохрание пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str, optional): user_id пользователя.
-            steam_id (int, optional): Steam ID пользователя.
-            save_data(bytes): Новый бинарный сейв юзера.
-
-        Returns:
-            DBUser | None: Обновленный объект пользователя или None если не найден.
-
+        """Функция `update_save_data` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+            save_data (bytes): Структура данных.
+        
+        Возвращает:
+            DBUser | None: Результат выполнения функции.
         """
         if not user_id and not steam_id:
             msg = "Необходимо передать хотя бы user_id или steam_id"
@@ -210,17 +170,15 @@ class UserManager:
 
     @staticmethod
     async def ban(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None) -> bool | None:
-        """
-        Блокировка пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str, optional): user_id пользователя.
-            steam_id (int, optional): steam_id пользователя.
-
-        Returns:
-            bool | None: True/False — если пользователь найден, None — если нет такого пользователя.
-
+        """Функция `ban` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+        
+        Возвращает:
+            bool | None: Результат выполнения функции.
         """
         if not user_id and not steam_id:
             msg = "Передайте хотя бы user_id или steam_id"
@@ -244,19 +202,15 @@ class UserManager:
 
     @staticmethod
     async def unban(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None) -> bool | None:
-        """
-        Разблокировка пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str, optional): user_id пользователя.
-            steam_id (int, optional): steam_id пользователя.
-
-        Returns:
-            bool | None: True — если пользователь найден и разбанен,
-                        False — если уже не был забанен,
-                        None — если пользователь не найден.
-
+        """Функция `unban` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+        
+        Возвращает:
+            bool | None: Результат выполнения функции.
         """
         if not user_id and not steam_id:
             msg = "Передайте хотя бы user_id или steam_id"
@@ -283,17 +237,15 @@ class UserManager:
 
     @staticmethod
     async def is_banned(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None) -> bool | None:
-        """
-        Проверка: является ли пользователь забаненным.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str, optional): user_id пользователя.
-            steam_id (int, optional): steam_id пользователя.
-
-        Returns:
-            bool | None: True/False — если пользователь найден, None — если нет такого пользователя.
-
+        """Функция `is_banned` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+        
+        Возвращает:
+            bool | None: Результат выполнения функции.
         """
         if not user_id and not steam_id:
             msg = "Передайте хотя бы user_id или steam_id"
@@ -314,17 +266,15 @@ class UserManager:
 
     @staticmethod
     async def update_last_login(db: AsyncSession, *, user_id: str | None = None, steam_id: int | None = None) -> DBUser | None:
-        """
-        Обновляет дату последнего входа пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str, optional): user_id пользователя.
-            steam_id (int, optional): Steam ID пользователя.
-
-        Returns:
-            DBUser | None: Обновленный объект пользователя или None если не найден.
-
+        """Функция `update_last_login` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | None): Идентификатор пользователя. Значение по умолчанию: None.
+            steam_id (int | None): Идентификатор steam. Значение по умолчанию: None.
+        
+        Возвращает:
+            DBUser | None: Результат выполнения функции.
         """
         if not user_id and not steam_id:
             msg = "Необходимо передать хотя бы user_id или steam_id"
@@ -349,17 +299,15 @@ class UserManager:
 
     @staticmethod
     async def update_user_flag(db: AsyncSession, user_id: str | int, **fields) -> DBUser | None:
-        """
-        Универсальное обновление любых флагов пользователя.
-
-        Args:
-            db (AsyncSession): сессия БД
-            user_id (str|int): ID пользователя (user_id или id)
-            fields: поля для обновления (например, is_banned=True, first_login_at=False), можно менять сразу несколько полей.
-
-        Returns:
-            DBUser | None: обновлённый пользователь или None, если не найден
-
+        """Функция `update_user_flag` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str | int): Идентификатор пользователя.
+            **fields (Any): Дополнительные именованные аргументы.
+        
+        Возвращает:
+            DBUser | None: Результат выполнения функции.
         """
         user = await UserManager.get_user(db, user_id=user_id)
         if not user:
@@ -374,16 +322,14 @@ class UserManager:
 
     @staticmethod
     async def get_inventory(db: AsyncSession, user_id: str) -> list[UserInventory] | None:
-        """
-        Получает инвентарь  пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str): user_id пользователя.
-
-        Returns:
-            list[UserInventory] | None : Обьект инвентаря юзера или None если не найден.
-
+        """Функция `get_inventory` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+        
+        Возвращает:
+            list[UserInventory] | None: Результат выполнения функции.
         """
         stmt = select(UserInventory).where(UserInventory.user_id == user_id)
         result = await db.execute(stmt)
@@ -396,18 +342,16 @@ class UserManager:
 
     @staticmethod
     async def add_inventory_item(db: AsyncSession, user_id: str, object_id: str, quantity: int = 1):
-        """
-        Добавляет предмет в инвентарь пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str): user_id пользователя.
-            object_id (str): object_id предмета.
-            quantity (int): количество предметов.
-
-        Returns:
-            list[UserInventory] | None : Обьект инвентаря юзера или None если не найден.
-
+        """Функция `add_inventory_item` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+            object_id (str): Идентификатор object.
+            quantity (int): Параметр `quantity`. Значение по умолчанию: 1.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
         """
         stmt = select(UserInventory).where(
             UserInventory.user_id == user_id,
@@ -433,17 +377,15 @@ class UserManager:
     @staticmethod
 
     async def remove_inventory_item(db: AsyncSession, user_id: str, object_id: str) -> bool:
-        """
-        Удаляет предмет из инвентаря пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str): user_id пользователя.
-            object_id (str): object_id предмета.
-
-        Returns:
-            bool : True если успешно, False если ошибка.
-
+        """Функция `remove_inventory_item` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+            object_id (str): Идентификатор object.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
         """
         stmt = select(UserInventory).where(
             UserInventory.user_id == user_id,
@@ -459,16 +401,14 @@ class UserManager:
 
     @staticmethod
     async def get_wallet(db: AsyncSession, user_id: str) -> list[UserWallet] | None:
-        """
-        Получает кошелек пользователя.
-
-        Args:
-            db (AsyncSession): Сессия БД.
-            user_id (str): user_id пользователя.
-
-        Returns:
-            list[UserWallet] | None : Обьект кошелька юзера или None если не найден.
-
+        """Функция `get_wallet` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+        
+        Возвращает:
+            list[UserWallet] | None: Результат выполнения функции.
         """
         stmt = select(UserWallet).where(UserWallet.user_id == user_id)
         result = await db.execute(stmt)
@@ -481,21 +421,16 @@ class UserManager:
 
     @staticmethod
     async def update_wallet(db: AsyncSession, user_id: str, currency: str, delta: int) -> "UserWallet":
-        """
-        Изменяет баланс определённой валюты пользователя.
-
-        Если у пользователя уже есть запись этой валюты в кошельке — увеличивает (или уменьшает) её баланс на заданную величину.
-        Если такой записи ещё нет — создаёт новую с указанным балансом.
-
-        Args:
-            db (AsyncSession): Асинхронная сессия SQLAlchemy.
-            user_id (str): Внутренний ID пользователя (ForeignKey на Users.id).
-            currency (str): Название валюты (например, "Shards", "Cells", "Bloodpoints").
-            delta (int): Изменение баланса (может быть отрицательным или положительным).
-
-        Returns:
-            UserWallet: Объект UserWallet с актуальным балансом пользователя для данной валюты.
-
+        """Функция `update_wallet` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+            currency (str): Параметр `currency`.
+            delta (int): Параметр `delta`.
+        
+        Возвращает:
+            "UserWallet": Результат выполнения функции.
         """
         stmt = select(UserWallet).where(
             UserWallet.user_id == user_id,
@@ -517,6 +452,18 @@ class UserManager:
 
     @staticmethod
     async def set_wallet_balance(db: AsyncSession, user_id: str, currency: str, balance: int):
+        """Функция `set_wallet_balance` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (str): Идентификатор пользователя.
+            currency (str): Параметр `currency`.
+            balance (int): Параметр `balance`.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         stmt = select(UserWallet).where(
             UserWallet.user_id == user_id,
             UserWallet.currency == currency,
@@ -534,6 +481,16 @@ class UserManager:
 
     @staticmethod
     async def get_user_ids_by_steam_ids(db, steam_ids):
+        """Функция `get_user_ids_by_steam_ids` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (Any): Подключение к базе данных.
+            steam_ids (Any): Параметр `steam_ids`.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         if not steam_ids:
             return {}
         stmt = select(DBUser.steam_id, DBUser.user_id).where(
@@ -550,15 +507,17 @@ class UserManager:
         level: int,
         prestige_level: int,
     ) -> None:
-        """
-        Обновляет прогресс игрока в базе:
-        XP, уровень, престиж.
-
-        :param db: сессия базы
-        :param user_id: ID игрока
-        :param xp: новый XP игрока
-        :param level: новый уровень игрока
-        :param prestige_level: новый престиж игрока
+        """Функция `update_player_progress` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            db (AsyncSession): Подключение к базе данных.
+            user_id (int): Идентификатор пользователя.
+            xp (int): Параметр `xp`.
+            level (int): Параметр `level`.
+            prestige_level (int): Параметр `prestige_level`.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
         """
         result = await db.execute(select(DBUser).where(DBUser.id == user_id))
         user = result.scalar_one_or_none()

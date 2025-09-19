@@ -25,8 +25,19 @@ STEAM_API_URL = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
 
 
 class Utils:
+    """Класс `Utils` описывает структуру приложения."""
+
     @staticmethod
     async def _decrypt_dbd(encrypted_bytes: bytes) -> str:
+        """Функция `_decrypt_dbd` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            encrypted_bytes (bytes): Параметр `encrypted_bytes`.
+        
+        Возвращает:
+            str: Результат выполнения функции.
+        """
+
         if not encrypted_bytes.startswith(b"DbdDAgAC"):
             msg = "Неверный формат зашифрованной строки."
             raise ValueError(msg)
@@ -61,15 +72,13 @@ class Utils:
 
     @staticmethod
     def token_to_steam_id(token: str) -> str | None:
-        """
-        Преобразует токен (hex-строку) в steam_id.
-
-        Args:
-            token (str): Токен в hex-формате.
-
-        Returns:
-            Optional[str]: Строковое представление steam_id, либо None если ошибка.
-
+        """Функция `token_to_steam_id` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            token (str): Параметр `token`.
+        
+        Возвращает:
+            str | None: Результат выполнения функции.
         """
         if not isinstance(token, str) or len(token) < 40:
             return None
@@ -82,7 +91,15 @@ class Utils:
 
     @staticmethod
     def xp_to_player_level(total_xp: int, current_level: int) -> dict[str, int]:
-        """Преобразует общий накопленный XP в состояние уровня/престижа, используя XP_TABLE."""
+        """Функция `xp_to_player_level` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            total_xp (int): Параметр `total_xp`.
+            current_level (int): Параметр `current_level`.
+        
+        Возвращает:
+            dict[str, int]: Результат выполнения функции.
+        """
         level_version = 34
         prestige = 0
         level = current_level
@@ -117,12 +134,17 @@ class Utils:
         consecutive_match: float,
         emblem_qualities: list[str],
     ) -> dict[str, int]:
-        """
-        Считает XP за матч по правилам из конфига:
-          - базовый XP = match_time * XP_PER_UNIT, но не больше CAP
-          - эмблемы = сумма по EMBLEM_XP (например: None=0, Bronze=0, Silver=6, Gold=12, Iridescent=18)
-          - первый матч = FIRST_MATCH_BONUS
-          - итог = (base + emblems + first) * max(1.0, consecutive_match).
+        """Функция `calc_match_xp` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            match_time (int): Параметр `match_time`.
+            is_first_match (bool): Логический флаг.
+            player_type (str): Параметр `player_type`.
+            consecutive_match (float): Параметр `consecutive_match`.
+            emblem_qualities (list[str]): Параметр `emblem_qualities`.
+        
+        Возвращает:
+            dict[str, int]: Результат выполнения функции.
         """
         time_xp_raw = match_time * XP_PER_UNIT
         base_time_xp = min(round(time_xp_raw), CAP)
@@ -150,10 +172,16 @@ class Utils:
         current_prestige: int,    # Devotion
         gained_xp: int,
     ) -> dict[str, int]:
-        """
-        Перекидывает XP по таблице уровней XP_TABLE:
-          - XP_TABLE[n] = сколько нужно XP, чтобы перейти С ТЕКУЩЕГО уровня n-1 на n (или аналогичная ваша семантика).
-          - При пересечении 99 -> 1 увеличиваем prestige.
+        """Функция `process_xp_gain` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            current_xp (int): Параметр `current_xp`.
+            current_level (int): Параметр `current_level`.
+            current_prestige (int): Параметр `current_prestige`.
+            gained_xp (int): Параметр `gained_xp`.
+        
+        Возвращает:
+            dict[str, int]: Результат выполнения функции.
         """
         new_xp = current_xp + gained_xp
         level = current_level
@@ -192,26 +220,16 @@ class Utils:
 
     @staticmethod
     def calc_rewards(old_level: int, new_level: int, old_prestige: int, new_prestige: int) -> list[dict[str, int]]:
-        """
-        Рассчитывает награды игроку за повышение уровня или престижа.
-
-        Аргументы:
-            old_level (int): уровень до матча.
-            new_level (int): уровень после матча.
-            old_prestige (int): престиж до матча.
-            new_prestige (int): престиж после матча.
-
+        """Функция `calc_rewards` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            old_level (int): Параметр `old_level`.
+            new_level (int): Параметр `new_level`.
+            old_prestige (int): Параметр `old_prestige`.
+            new_prestige (int): Параметр `new_prestige`.
+        
         Возвращает:
-            List[dict]: список наград в формате:
-                [
-                    {"currency": "Shards", "balance": 100},
-                    {"currency": "Cells", "balance": 50},
-                ]
-
-        Правила (можешь менять под себя):
-            - Каждый новый уровень → +100 Shards
-            - Каждый 10-й уровень → дополнительно +50 Cells
-            - Каждый новый престиж → +500 Cells и +2000 Shards
+            list[dict[str, int]]: Результат выполнения функции.
         """
         rewards = []
 
@@ -236,6 +254,20 @@ class Utils:
         base_backoff: float = 1.0,
         concurrency: int = 3,
     ) -> dict[str, str]:
+        """Функция `fetch_names_batch` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            steam_ids (list[str]): Параметр `steam_ids`.
+            api_key (str | None): Параметр `api_key`. Значение по умолчанию: None.
+            timeout (float): Параметр `timeout`. Значение по умолчанию: 10.0.
+            max_retries (int): Параметр `max_retries`. Значение по умолчанию: 3.
+            base_backoff (float): Параметр `base_backoff`. Значение по умолчанию: 1.0.
+            concurrency (int): Параметр `concurrency`. Значение по умолчанию: 3.
+        
+        Возвращает:
+            dict[str, str]: Результат выполнения функции.
+        """
+
         api_key = STEAM_API_KEY
         if not steam_ids:
             return {}
@@ -245,6 +277,16 @@ class Utils:
         sem = asyncio.Semaphore(max(1, concurrency))
 
         async def fetch_chunk(client: httpx.AsyncClient, chunk: list[str]) -> dict[str, str]:
+            """Функция `fetch_chunk` выполняет прикладную задачу приложения.
+            
+            Параметры:
+                client (httpx.AsyncClient): Параметр `client`.
+                chunk (list[str]): Параметр `chunk`.
+            
+            Возвращает:
+                dict[str, str]: Результат выполнения функции.
+            """
+
             nonlocal api_key
             params = {"key": api_key, "steamids": ",".join(chunk)}
 
@@ -308,6 +350,19 @@ class Utils:
 
     @staticmethod
     async def get_item_price(character_name: str | None = None, outfit_id: str | None = None, item_id: str | None = None, currency_id: str | None = None, redis=None):
+        """Функция `get_item_price` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            character_name (str | None): Параметр `character_name`. Значение по умолчанию: None.
+            outfit_id (str | None): Идентификатор outfit. Значение по умолчанию: None.
+            item_id (str | None): Идентификатор item. Значение по умолчанию: None.
+            currency_id (str | None): Идентификатор currency. Значение по умолчанию: None.
+            redis (Any): Подключение к Redis. Значение по умолчанию: None.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         from dependency.redis import Redis
         bin_path = Path("../assets/cdn/catalog.bin").resolve()
         data = None
@@ -359,5 +414,16 @@ class Utils:
 
     @staticmethod
     def get_balance(wallet: list, currency: str, default=None):
+        """Функция `get_balance` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            wallet (list): Параметр `wallet`.
+            currency (str): Параметр `currency`.
+            default (Any): Параметр `default`. Значение по умолчанию: None.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         rec = next((w for w in wallet if getattr(w, "currency", None) == currency), None)
         return getattr(rec, "balance", default) if rec else default

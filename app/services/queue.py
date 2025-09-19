@@ -10,11 +10,7 @@ from .lobby import LobbyManager
 
 
 class MatchQueue:
-    """
-    Очередь матчмейкинга:
-    - B-игроки заполняют A-лобби в порядке их создания (FIFO по лобби).
-    - Позиция игрока в очереди B учитывает уже открытые лобби и их свободные места.
-    """
+    """Класс `MatchQueue` описывает структуру приложения."""
 
     LUA_JOIN_NONHOST = r"""
     -- KEYS[1] = lobby:{id}
@@ -65,6 +61,20 @@ class MatchQueue:
         avg_match_seconds: int = 10,
         max_survivors: int = 4,
     ) -> None:
+        """Функция `__init__` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            redis (Redis): Подключение к Redis.
+            side (Literal["A", "B"]): Параметр `side`.
+            lobby_manager (LobbyManager): Менеджер бизнес-логики.
+            avg_match_seconds (int): Параметр `avg_match_seconds`. Значение по умолчанию: 10.
+            max_survivors (int): Параметр `max_survivors`. Значение по умолчанию: 4.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
+        """
+
         self.redis = redis
         self.side = side.upper()
         self.key = f"queue:{self.side}"  # Redis list
@@ -80,6 +90,16 @@ class MatchQueue:
 
 
     async def _decode(self, v) -> str | None:
+        """Функция `_decode` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            v (Any): Параметр `v`.
+        
+        Возвращает:
+            str | None: Результат выполнения функции.
+        """
+
         if v is None:
             return None
         if isinstance(v, bytes):
@@ -89,15 +109,43 @@ class MatchQueue:
         return None
 
     async def _llen(self, side: Literal["A", "B"]) -> int:
+        """Функция `_llen` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            side (Literal["A", "B"]): Параметр `side`.
+        
+        Возвращает:
+            int: Результат выполнения функции.
+        """
+
         return int(await self.redis.llen(f"queue:{side}"))
 
     async def _sizes(self) -> tuple[int, int]:
+        """Функция `_sizes` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+        
+        Возвращает:
+            tuple[int, int]: Результат выполнения функции.
+        """
+
         size_a = await self._llen("A")
         size_b = await self._llen("B")
         return size_a, size_b
 
     async def _register_open_lobby(self, lobby_id: str, created_ts: float | None = None) -> None:
-        """Регистрирует лобби в сетах открытых лобби и в zset (FIFO-порядок по score)."""
+        """Функция `_register_open_lobby` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            lobby_id (str): Идентификатор лобби.
+            created_ts (float | None): Параметр `created_ts`. Значение по умолчанию: None.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
+        """
         ts = float(created_ts or time.time())
         pipe = self.redis.pipeline()
         pipe.sadd(self.key_open_set, lobby_id)
@@ -105,13 +153,30 @@ class MatchQueue:
         await pipe.execute()
 
     async def _unregister_open_lobby(self, lobby_id: str) -> None:
+        """Функция `_unregister_open_lobby` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            lobby_id (str): Идентификатор лобби.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
+        """
+
         pipe = self.redis.pipeline()
         pipe.srem(self.key_open_set, lobby_id)
         pipe.zrem(self.key_open_zset, lobby_id)
         await pipe.execute()
 
     async def _get_open_lobby_ids_fifo(self) -> list[str]:
-        """Возвращает список lobby_id в порядке FIFO (по score)."""
+        """Функция `_get_open_lobby_ids_fifo` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+        
+        Возвращает:
+            list[str]: Результат выполнения функции.
+        """
         ids = await self.redis.zrange(self.key_open_zset, 0, -1)
         out: list[str] = []
         for raw in ids:
@@ -121,7 +186,14 @@ class MatchQueue:
         return out
 
     async def _get_open_lobbies_fifo(self) -> list[dict[str, Any]]:
-        """Возвращает список лобби (JSON) в FIFO-порядке. Фильтрует мёртвые."""
+        """Функция `_get_open_lobbies_fifo` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+        
+        Возвращает:
+            list[dict[str, Any]]: Результат выполнения функции.
+        """
         out: list[dict[str, Any]] = []
         for lid in await self._get_open_lobby_ids_fifo():
             lobby = await self.lobby_manager.get_lobby_by_id(lid)
@@ -134,7 +206,14 @@ class MatchQueue:
         return out
 
     async def _available_b_slots_fifo(self) -> int:
-        """Считает суммарное кол-во свободных слотов B во всех открытых лобби (FIFO)."""
+        """Функция `_available_b_slots_fifo` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+        
+        Возвращает:
+            int: Результат выполнения функции.
+        """
         total = 0
         for lobby in await self._get_open_lobbies_fifo():
             nonhosts = lobby.get("nonHosts") or []
@@ -144,7 +223,15 @@ class MatchQueue:
 
 
     async def get_queued_player(self, bhvr_session: str) -> tuple[dict | None, int, str | None]:
-        """Ищет игрока в своей очереди по bhvr_session. Возвращает (obj, idx, raw_json)."""
+        """Функция `get_queued_player` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            bhvr_session (str): Объект сессии.
+        
+        Возвращает:
+            tuple[dict | None, int, str | None]: Результат выполнения функции.
+        """
         items = await self.redis.lrange(self.key, 0, -1)
         for idx, raw in enumerate(items):
             raw_str = await self._decode(raw)
@@ -165,9 +252,17 @@ class MatchQueue:
         side: Literal["A", "B"],
         last_checked_for_match: float | None = None,
     ) -> None:
-        """
-        Добавляет игрока в очередь соответствующей стороны.
-        Для стороны A: игрок не должен добавляться в очередь B-очереди-экземпляра и наоборот.
+        """Функция `add_player` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            bhvr_session (str): Объект сессии.
+            user_id (str): Идентификатор пользователя.
+            side (Literal["A", "B"]): Параметр `side`.
+            last_checked_for_match (float | None): Параметр `last_checked_for_match`. Значение по умолчанию: None.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
         """
         side = side.upper()
         if side != self.side:
@@ -189,6 +284,16 @@ class MatchQueue:
         await self.redis.rpush(self.key, json.dumps(data))
 
     async def remove_player(self, bhvr_session: str) -> bool:
+        """Функция `remove_player` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            bhvr_session (str): Объект сессии.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
+        """
+
         player, _, raw = await self.get_queued_player(bhvr_session)
         if not player or not raw:
             return False
@@ -197,6 +302,19 @@ class MatchQueue:
 
 
     def _queue_response(self, eta_sec: int, position: int, size_a: int, size_b: int):
+        """Функция `_queue_response` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            eta_sec (int): Параметр `eta_sec`.
+            position (int): Параметр `position`.
+            size_a (int): Параметр `size_a`.
+            size_b (int): Параметр `size_b`.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         # position — 1-based, реальная с учётом свободных мест в открытых лобби
         return {
             "queueData": {
@@ -210,6 +328,19 @@ class MatchQueue:
         }
 
     def _make_matched_response(self, creator_id, match_id, side_a, side_b):
+        """Функция `_make_matched_response` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            creator_id (Any): Идентификатор creator.
+            match_id (Any): Идентификатор матча.
+            side_a (Any): Параметр `side_a`.
+            side_b (Any): Параметр `side_b`.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         return {
             "status": "MATCHED",
             "matchData": {
@@ -234,19 +365,27 @@ class MatchQueue:
 
 
     async def _real_position_for_B(self, index_0based: int) -> int:
-        """
-        Реальная 1-based позиция B-игрока в очереди с учётом свободных мест в уже открытых лобби.
-        Пример: 1 лобби (3/4) → свободно 1; в очереди 5 игроков.
-            i=0 → матчится (вы это увидите через MATCHED), у остальных позиции 1..4.
-            Формула: max(1, i - free_slots_total + 1).
+        """Функция `_real_position_for_B` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            index_0based (int): Параметр `index_0based`.
+        
+        Возвращает:
+            int: Результат выполнения функции.
         """
         free_total = await self._available_b_slots_fifo()
         return max(1, index_0based - free_total + 1)
 
     async def _eta_for_B(self, position_1based: int) -> int:
-        """
-        Примерная оценка ETA: количество «волн» по avg_match_seconds.
-        В одной «волне» мы заполняем: свободные места в открытых лобби + будущие лобби от A (size_a * max_survivors).
+        """Функция `_eta_for_B` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            position_1based (int): Параметр `position_1based`.
+        
+        Возвращает:
+            int: Результат выполнения функции.
         """
         size_a, size_b = await self._sizes()
         free_now = await self._available_b_slots_fifo()
@@ -257,7 +396,14 @@ class MatchQueue:
         return int(batches * self.avg_match_seconds)
 
     async def _eta_for_A(self) -> int:
-        """Примерная оценка ETA для A: сколько B нужно добрать до полного лобби."""
+        """Функция `_eta_for_A` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+        
+        Возвращает:
+            int: Результат выполнения функции.
+        """
         size_a, size_b = await self._sizes()
         # Сколько уже в открытых лобби людей B (сумма nonHosts) нас не интересует для ETA А,
         # здесь грубо считаем, что нужно self.max_survivors B, и их даст очередь B.
@@ -265,12 +411,13 @@ class MatchQueue:
         return int(need_b * self.avg_match_seconds)
 
     async def get_stats(self) -> dict[str, int]:
-        """
-        Возвращает статистику:
-         - openLobbies: кол-во открытых лобби (готовых и не начатых)
-         - queueA: длина очереди A
-         - queueB: длина очереди B
-         - queuedTotal: суммарная очередь.
+        """Функция `get_stats` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+        
+        Возвращает:
+            dict[str, int]: Результат выполнения функции.
         """
         open_lobbies = len(await self._get_open_lobbies_fifo())
         size_a, size_b = await self._sizes()
@@ -281,10 +428,14 @@ class MatchQueue:
         }
 
     async def get_queue_status(self, session: dict[str, Any]):
-        """
-        Основной метод для клиента.
-        - Если игрок сматчен → MATCHED + данные матча.
-        - Иначе → статус QUEUED + реальная позиция и ETA.
+        """Функция `get_queue_status` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            session (dict[str, Any]): Объект сессии.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
         """
         qp, idx, _raw = await self.get_queued_player(session["bhvrSession"])
         if not qp:
@@ -371,7 +522,16 @@ class MatchQueue:
 
     @staticmethod
     async def create_match_response(lobby_manager: LobbyManager, match_id: str, killed: bool = False):
-        """Возвращает снэпшот матча по match_id."""
+        """Функция `create_match_response` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            lobby_manager (LobbyManager): Менеджер бизнес-логики.
+            match_id (str): Идентификатор матча.
+            killed (bool): Параметр `killed`. Значение по умолчанию: False.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
         lobby = await lobby_manager.get_lobby_by_id(match_id)
         if not lobby:
             lobby = await lobby_manager.get_killed_lobby_by_id(match_id)

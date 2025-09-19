@@ -11,6 +11,8 @@ USERS_DATABASE_URL = "sqlite+aiosqlite:///../data/USERS.db"
 users_metadata = MetaData()
 
 class UsersBase(DeclarativeBase):
+    """Класс `UsersBase` наследуется от DeclarativeBase и описывает структуру приложения."""
+
     metadata = users_metadata
 
 user_engine = create_async_engine(USERS_DATABASE_URL)
@@ -18,11 +20,30 @@ users_sessionmaker = async_sessionmaker(user_engine, expire_on_commit=False)
 
 @event.listens_for(user_engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record) -> None:
+    """Функция `set_sqlite_pragma` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        dbapi_connection (Any): Подключение к базе данных.
+        connection_record (Any): Параметр `connection_record`.
+    
+    Возвращает:
+        None: Функция не возвращает значение.
+    """
+
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL;")
     cursor.execute("PRAGMA synchronous=NORMAL;")
     cursor.close()
 
 async def get_user_session() -> AsyncSession:
+    """Функция `get_user_session` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        AsyncSession: Результат выполнения функции.
+    """
+
     async with users_sessionmaker() as session:
         yield session
