@@ -17,17 +17,39 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=settings.api_prefix, tags=["Store"])
 
+
 @router.get("/extensions/store/steamGetPendingTransactions")
 async def steam_get_pending_transactions():
+    """Функция `steam_get_pending_transactions` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     return {
         "transactionOrderIdList": [],
     }
+
 
 @router.post("/extensions/store/steamGetPendingTransactions")
 async def get_pending_transactions(request: Request,
                         db_users: Annotated[AsyncSession, Depends(get_user_session)],
                         db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
+    """Функция `get_pending_transactions` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -85,6 +107,7 @@ async def get_pending_transactions(request: Request,
         "consentList": consent_list,
     }
 
+
 @router.get("/consent")
 async def get_user_consent(
     request: Request,
@@ -92,6 +115,18 @@ async def get_user_consent(
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
     onlyAttentionNeeded: bool = False,
 ):
+    """Функция `get_user_consent` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+        onlyAttentionNeeded (bool): Параметр `onlyAttentionNeeded`. Значение по умолчанию: False.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -149,12 +184,24 @@ async def get_user_consent(
         "consentList": consent_list,
     }
 
+
 @router.put("/consent")
 async def update_user_consent(
     request: Request,
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
+    """Функция `update_user_consent` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -163,14 +210,8 @@ async def update_user_consent(
         raise HTTPException(status_code=401, detail="Session not found")
 
     await request.json()
-    # data = {'list': [{'consentId': ..., 'isGiven': ...}, ...]}
-
-    # Тут можешь сохранить согласия юзера в БД, если надо
-    # Например:
-    # for consent in data['list']:
-    #     save_user_consent(user_id, consent['consentId'], consent['isGiven'])
-
     return {}
+
 
 @router.post("/purchases/{character_name}")
 async def buy_character(character_name: str,
@@ -178,6 +219,19 @@ async def buy_character(character_name: str,
                         db_users: Annotated[AsyncSession, Depends(get_user_session)],
                         db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
                         redis = Depends(Redis.get_redis)):
+    """Функция `buy_character` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        character_name (str): Параметр `character_name`.
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -205,26 +259,37 @@ async def buy_character(character_name: str,
     if currency_balance < price:
         raise HTTPException(400, detail="Not enough currency")
 
-    if currency_balance >= price:
-        await UserManager.update_wallet(db_users, user_id, currency_type, -price)
-        await UserManager.add_inventory_item(db_users, user_id, character_name, 1)
+    await UserManager.update_wallet(db_users, user_id, currency_type, -price)
+    await UserManager.add_inventory_item(db_users, user_id, character_name, 1)
 
-        new_balance = currency_balance - price
+    new_balance = currency_balance - price
 
-        response = {
-            "boughtItemIds": [character_name],
-            "remainingBalance": new_balance,
-            "currencyId": currency_type,
-        }
+    response = {
+        "boughtItemIds": [character_name],
+        "remainingBalance": new_balance,
+        "currencyId": currency_type,
+    }
 
-        return JSONResponse(content=response, status_code=200)
-    return None
+    return JSONResponse(content=response, status_code=200)
+
 
 @router.post("/extensions/store/purchaseOutfit")
 async def buy_outfit(request: Request,
                         db_users: Annotated[AsyncSession, Depends(get_user_session)],
                         db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
                         redis = Depends(Redis.get_redis)):
+    """Функция `buy_outfit` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -232,7 +297,7 @@ async def buy_outfit(request: Request,
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
 
-    raw  = await request.json()
+    raw = await request.json()
     body = raw.get("data", raw)
     currency_type = body.get("currencyId")
     outfit_id = body.get("outfitId")
@@ -265,11 +330,24 @@ async def buy_outfit(request: Request,
 
     return JSONResponse(content=response, status_code=200)
 
+
 @router.post("/extensions/store/purchaseCustomizationItem")
 async def buy_item(request: Request,
                    db_users: Annotated[AsyncSession, Depends(get_user_session)],
                    db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
                    redis = Depends(Redis.get_redis)):
+    """Функция `buy_item` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -277,7 +355,7 @@ async def buy_item(request: Request,
     if not user_id:
         raise HTTPException(status_code=401, detail="Session not found")
 
-    raw  = await request.json()
+    raw = await request.json()
     body = raw.get("data", raw)
     currency_type = body.get("currencyId")
     item_id = body.get("itemId")

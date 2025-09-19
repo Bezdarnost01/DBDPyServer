@@ -7,6 +7,8 @@ from sqlalchemy import BigInteger, Column, DateTime, Integer, String
 MOSCOW = pytz.timezone("Europe/Moscow")
 
 class Sessions(SessionsBase):
+    """Класс `Sessions` наследуется от SessionsBase и описывает структуру приложения."""
+
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True)

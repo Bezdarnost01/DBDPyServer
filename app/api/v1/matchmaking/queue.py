@@ -28,6 +28,19 @@ async def queue_player(
     db_sessions: AsyncSession = Depends(get_sessions_session),
     db_users: AsyncSession = Depends(get_user_session),
 ):
+    """Функция `queue_player` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        body (Annotated[QueueRequest, Body()]): Данные тела запроса.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+        db_sessions (AsyncSession): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+        db_users (AsyncSession): Подключение к базе данных. Значение по умолчанию: Depends(get_user_session).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -72,6 +85,19 @@ async def match_register(
     db_sessions: AsyncSession = Depends(get_sessions_session),
     db_users: AsyncSession = Depends(get_user_session),
 ):
+    """Функция `match_register` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        match_id (str): Идентификатор матча.
+        request (Request): Входящий HTTP-запрос.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+        db_sessions (AsyncSession): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+        db_users (AsyncSession): Подключение к базе данных. Значение по умолчанию: Depends(get_user_session).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     try:
         body = await request.json()
     except Exception:
@@ -110,6 +136,17 @@ async def match_register(
 
 
 async def create_match_response(lobby_manager: LobbyManager, match_id: str, killed: bool = False):
+    """Функция `create_match_response` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        lobby_manager (LobbyManager): Менеджер бизнес-логики.
+        match_id (str): Идентификатор матча.
+        killed (bool): Параметр `killed`. Значение по умолчанию: False.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     lobby = await lobby_manager.get_lobby_by_id(match_id)
     if not lobby:
         lobby = await lobby_manager.get_killed_lobby_by_id(match_id)
@@ -144,6 +181,17 @@ async def get_match(
     request: Request,
     redis = Depends(Redis.get_redis),
 ):
+    """Функция `get_match` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        match_id (str): Идентификатор матча.
+        request (Request): Входящий HTTP-запрос.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     lobby_manager = request.app.state.lobby_manager
     response = await create_match_response(lobby_manager, match_id)
     if not response:
@@ -158,6 +206,18 @@ async def close_match(
     request: Request,
     redis = Depends(Redis.get_redis),
 ):
+    """Функция `close_match` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        match_id (str): Идентификатор матча.
+        reason (str): Параметр `reason`.
+        request (Request): Входящий HTTP-запрос.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=404, detail="No session cookie")
@@ -177,7 +237,7 @@ async def close_match(
             return {"error": f"json error: {e!s}"}
 
         await lobby_manager.delete_match(match_id)
-        return await MatchQueue.create_match_response(lobby_manager, match_id, killed=True)
+        return await create_match_response(lobby_manager, match_id, killed=True)
     removed = await lobby_manager.remove_player_from_lobby(match_id, bhvr_session)
     if not removed:
         raise HTTPException(status_code=404, detail="Player not found in lobby")
@@ -188,6 +248,16 @@ async def cancel_queue(
     request: Request,
     redis = Depends(Redis.get_redis),
 ):
+    """Функция `cancel_queue` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        redis (Any): Подключение к Redis. Значение по умолчанию: Depends(Redis.get_redis).
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=404, detail="No session cookie")
@@ -199,17 +269,48 @@ async def cancel_queue(
 
     return Response(status_code=204)
 
+
 @router.post("/players/recentlyplayed/add")
 async def player_add():
+    """Функция `player_add` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     return {}
+
 
 @router.post("/end-of-match-event")
 async def end_of_match_event():
+    """Функция `end_of_match_event` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     return {}
+
 
 @router.put("/softWallet/put/analytics")
 async def put_analytics():
+    """Функция `put_analytics` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     return {}
+
 
 @router.post("/extensions/playerLevels/earnPlayerXp")
 async def earnPlayerXp(
@@ -217,6 +318,17 @@ async def earnPlayerXp(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
+    """Функция `earnPlayerXp` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")

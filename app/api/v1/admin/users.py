@@ -22,6 +22,18 @@ async def kick_user(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
+    """Функция `kick_user` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        body (KickUserRequest): Данные тела запроса.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
 
@@ -76,6 +88,18 @@ async def ban_user(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
+    """Функция `ban_user` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        body (BanUserRequest): Данные тела запроса.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
 
@@ -143,17 +167,16 @@ async def unban_user(
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
     db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)],
 ):
-    """
-    Разбан пользователя (работает и оффлайн, и онлайн).
-
-    Принимает один из идентификаторов:
-    - bhvr_session
-    - user_id
-    - steam_id
-    - steam_name
-
-    Если игрок в онлайне — сессия остаётся активной.
-    Если игрок оффлайн — просто снимается флаг бана в БД.
+    """Функция `unban_user` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        body (BanUserRequest): Данные тела запроса.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
     """
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
@@ -208,6 +231,18 @@ async def give_bloodpoints(request: Request,
     count: int,
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
+    """Функция `give_bloodpoints` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        user_id (str): Идентификатор пользователя.
+        count (int): Параметр `count`.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
 
@@ -224,6 +259,17 @@ async def get_user_save(request: Request,
     user_id: str,
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
+    """Функция `get_user_save` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        user_id (str): Идентификатор пользователя.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
 
@@ -241,6 +287,18 @@ async def set_user_save(request: Request,
     body: Annotated[dict, Body()],
     db_users: Annotated[AsyncSession, Depends(get_user_session)],
 ):
+    """Функция `set_user_save` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        user_id (str): Идентификатор пользователя.
+        body (Annotated[dict, Body()]): Данные тела запроса.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     if request.client.host not in settings.ip_admin_list:
         raise HTTPException(403, detail="Forbidden")
 

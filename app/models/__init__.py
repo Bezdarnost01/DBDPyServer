@@ -8,6 +8,15 @@ from .wallet import UserWallet as UserWallet
 
 
 async def init_all_databases() -> None:
+    """Функция `init_all_databases` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        None: Функция не возвращает значение.
+    """
+
     async with user_engine.begin() as conn:
         await conn.run_sync(UsersBase.metadata.create_all)
     async with sessions_engine.begin() as conn:

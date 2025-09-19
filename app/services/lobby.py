@@ -6,16 +6,32 @@ from aioredis import Redis
 
 
 class LobbyManager:
-    """
-    Менеджер игровых лобби в Redis.
-    Хранит каждое лобби как ключ 'lobby:{id}' (JSON),
-    а список всех лобби — как SET 'lobbies:open'.
-    """
+    """Класс `LobbyManager` описывает структуру приложения."""
 
     def __init__(self, redis: Redis) -> None:
+        """Функция `__init__` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            redis (Redis): Подключение к Redis.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
+        """
+
         self.redis = redis
 
     async def get_lobby_by_id(self, id: int):
+        """Функция `get_lobby_by_id` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            id (int): Идентификатор объекта.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         lobby_json = await self.redis.get(f"lobby:{id}")
         if not lobby_json:
             return None
@@ -23,12 +39,33 @@ class LobbyManager:
 
 
     async def get_killed_lobby_by_id(self, lobby_id: str):
+        """Функция `get_killed_lobby_by_id` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            lobby_id (str): Идентификатор лобби.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         lobby_json = await self.redis.get(f"killed_lobby:{lobby_id}")
         if not lobby_json:
             return None
         return json.loads(lobby_json)
 
     async def create_lobby(self, host: dict, match_id: str | None = None) -> str:
+        """Функция `create_lobby` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            host (dict): Параметр `host`.
+            match_id (str | None): Идентификатор матча. Значение по умолчанию: None.
+        
+        Возвращает:
+            str: Результат выполнения функции.
+        """
+
         if not match_id:
             match_id = str(uuid.uuid4())
         lobby_key = f"lobby:{match_id}"
@@ -59,6 +96,17 @@ class LobbyManager:
         return match_id
 
     async def register_match(self, match_id: str, session_settings: dict):
+        """Функция `register_match` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            match_id (str): Идентификатор матча.
+            session_settings (dict): Объект сессии.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         lobby_json = await self.redis.get(f"lobby:{match_id}")
         if not lobby_json:
             return None
@@ -71,6 +119,16 @@ class LobbyManager:
         return lobby
 
     async def delete_match(self, match_id: str) -> None:
+        """Функция `delete_match` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            match_id (str): Идентификатор матча.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
+        """
+
         lobby_json = await self.redis.get(f"lobby:{match_id}")
         if not lobby_json:
             return
@@ -83,6 +141,17 @@ class LobbyManager:
         await self.redis.sadd("lobbies:killed", match_id)
 
     async def is_owner(self, match_id: str, bhvr_session: str) -> bool:
+        """Функция `is_owner` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            match_id (str): Идентификатор матча.
+            bhvr_session (str): Объект сессии.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
+        """
+
         lobby_json = await self.redis.get(f"lobby:{match_id}")
         if not lobby_json:
             return False
@@ -90,6 +159,16 @@ class LobbyManager:
         return lobby["host"]["bhvrSession"] == bhvr_session
 
     async def delete_old_matches(self, minutes: int = 5) -> None:
+        """Функция `delete_old_matches` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            minutes (int): Параметр `minutes`. Значение по умолчанию: 5.
+        
+        Возвращает:
+            None: Функция не возвращает значение.
+        """
+
         cutoff = int(time.time() * 1000) - minutes * 60 * 1000
         killed_ids = await self.redis.smembers("lobbies:killed")
         for lobby_id in killed_ids:
@@ -102,9 +181,15 @@ class LobbyManager:
                 await self.redis.srem("lobbies:killed", lobby_id)
 
     async def remove_player_from_lobby(self, match_id: str, bhvr_session: str) -> bool:
-        """
-        Удаляет игрока из nonHosts по bhvr_session.
-        Возвращает True если игрок был удалён, иначе False.
+        """Функция `remove_player_from_lobby` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            match_id (str): Идентификатор матча.
+            bhvr_session (str): Объект сессии.
+        
+        Возвращает:
+            bool: Результат выполнения функции.
         """
         lobby_json = await self.redis.get(f"lobby:{match_id}")
         if not lobby_json:
@@ -126,6 +211,16 @@ class LobbyManager:
         return True
 
     async def find_lobby_by_host_session(self, bhvr_session: str):
+        """Функция `find_lobby_by_host_session` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            self (Any): Текущий экземпляр класса.
+            bhvr_session (str): Объект сессии.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         open_ids = await self.redis.smembers("lobbies:open")
         for lobby_id in open_ids:
             lobby_json = await self.redis.get(f"lobby:{lobby_id}")

@@ -21,6 +21,17 @@ router = APIRouter(tags=["RTM"])
 async def get_rtm_url(request: Request,
                       db_users: Annotated[AsyncSession, Depends(get_user_session)],
                       db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)]):
+    """Функция `get_rtm_url` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
         raise HTTPException(status_code=401, detail="No session cookie")
@@ -38,6 +49,17 @@ async def get_rtm_url(request: Request,
 
 @router.websocket("/{path}")
 async def websocket_rtm(websocket: WebSocket, path: str, db_sessions: AsyncSession = Depends(get_sessions_session)) -> None:
+    """Функция `websocket_rtm` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        websocket (WebSocket): Параметр `websocket`.
+        path (str): Параметр `path`.
+        db_sessions (AsyncSession): Объект сессии. Значение по умолчанию: Depends(get_sessions_session).
+    
+    Возвращает:
+        None: Функция не возвращает значение.
+    """
+
     try:
         user_id, token1, token2 = path.split(":")
     except ValueError:

@@ -14,22 +14,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def refresh_session(func):
-    """
-    Декоратор для авто-рефреша жизни сессии по bhvrSession.
-    Используй на роуте, где нужно продлевать жизнь сессии.
-
-    Аргументы:
-        func: async endpoint function, которая обязательно принимает
-            request: Request и db: AsyncSession (или через Depends)
-
-    Пример:
-        @router.get("/profile")
-        @refresh_session
-        async def profile(request: Request, db: AsyncSession = Depends(get_async_session)):
-            ...
+    """Функция `refresh_session` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        func (Any): Параметр `func`.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
     """
     @wraps(func)
     async def wrapper(*args, **kwargs):
+        """Функция `wrapper` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            *args (Any): Дополнительные позиционные аргументы.
+            **kwargs (Any): Дополнительные именованные аргументы.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         # Получаем Request и AsyncSession
         request = kwargs.get("request") or next((a for a in args if isinstance(a, Request)), None)
         db = kwargs.get("db") or next((a for a in args if isinstance(a, AsyncSession)), None)
@@ -42,7 +46,14 @@ def refresh_session(func):
     return wrapper
 
 def setup_call_logger(file_path: str = "trace.log") -> logging.Logger:
-    """Создаёт/возвращает логгер для call-трейсов."""
+    """Функция `setup_call_logger` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        file_path (str): Параметр `file_path`. Значение по умолчанию: "trace.log".
+    
+    Возвращает:
+        logging.Logger: Результат выполнения функции.
+    """
     logger = logging.getLogger("call-trace")
     if logger.handlers:
         return logger
@@ -57,23 +68,54 @@ def setup_call_logger(file_path: str = "trace.log") -> logging.Logger:
 
 
 def log_call(file_path: str = "trace.log") -> Callable:
-    """
-    Декоратор.  Пример:
-        @log_call("logs/trace.log")
-        async def my_route(...):
-            ...
+    """Функция `log_call` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        file_path (str): Параметр `file_path`. Значение по умолчанию: "trace.log".
+    
+    Возвращает:
+        Callable: Результат выполнения функции.
     """
     logger = setup_call_logger(file_path)
 
     def decorator(fn: Callable) -> Callable:
+        """Функция `decorator` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            fn (Callable): Параметр `fn`.
+        
+        Возвращает:
+            Callable: Результат выполнения функции.
+        """
+
         is_async = inspect.iscoroutinefunction(fn)
 
         @functools.wraps(fn)
         async def async_wrapper(*args, **kwargs):
+            """Функция `async_wrapper` выполняет прикладную задачу приложения.
+            
+            Параметры:
+                *args (Any): Дополнительные позиционные аргументы.
+                **kwargs (Any): Дополнительные именованные аргументы.
+            
+            Возвращает:
+                Any: Результат выполнения функции.
+            """
+
             return await _run(fn, args, kwargs, logger, is_async=True)
 
         @functools.wraps(fn)
         def sync_wrapper(*args, **kwargs):
+            """Функция `sync_wrapper` выполняет прикладную задачу приложения.
+            
+            Параметры:
+                *args (Any): Дополнительные позиционные аргументы.
+                **kwargs (Any): Дополнительные именованные аргументы.
+            
+            Возвращает:
+                Any: Результат выполнения функции.
+            """
+
             return _run(fn, args, kwargs, logger, is_async=False)
 
         return async_wrapper if is_async else sync_wrapper
@@ -82,10 +124,33 @@ def log_call(file_path: str = "trace.log") -> Callable:
 
 
 async def _run(fn, args, kwargs, logger, is_async: bool):
+    """Функция `_run` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        fn (Any): Параметр `fn`.
+        args (Any): Параметр `args`.
+        kwargs (Any): Параметр `kwargs`.
+        logger (Any): Параметр `logger`.
+        is_async (bool): Логический флаг.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     t0 = time.perf_counter()
     call_id = f"{fn.__module__}.{fn.__name__}"
 
     def _short(v: Any, limit: int = 120):
+        """Функция `_short` выполняет прикладную задачу приложения.
+        
+        Параметры:
+            v (Any): Параметр `v`.
+            limit (int): Параметр `limit`. Значение по умолчанию: 120.
+        
+        Возвращает:
+            Any: Результат выполнения функции.
+        """
+
         s = repr(v)
         return s if len(s) <= limit else s[:limit] + "…"
 

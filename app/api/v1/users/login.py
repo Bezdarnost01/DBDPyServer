@@ -20,6 +20,18 @@ SESSION_LENGTH = 60 * 60
 async def steam_login(token: str, response: Response,
                       db_users: Annotated[AsyncSession, Depends(get_user_session)],
                       db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)]):
+    """Функция `steam_login` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        token (str): Параметр `token`.
+        response (Response): HTTP-ответ.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     steam_id = Utils.token_to_steam_id(token)
     if not steam_id:
         raise HTTPException(status_code=400, detail="Invalid token")
@@ -76,6 +88,15 @@ async def steam_login(token: str, response: Response,
 @router.post("/me/logout")
 async def logout(request: Request,
                  db_session: Annotated[AsyncSession, Depends(get_sessions_session)]) -> None:
+    """Функция `logout` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_session (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        None: Функция не возвращает значение.
+    """
 
     bhvr_session = request.cookies.get("bhvrSession")
     if not bhvr_session:
@@ -87,6 +108,17 @@ async def logout(request: Request,
 async def rich_presence(request: Request,
                         db_users: Annotated[AsyncSession, Depends(get_user_session)],
                         db_sessions: Annotated[AsyncSession, Depends(get_sessions_session)]):
+    """Функция `rich_presence` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        request (Request): Входящий HTTP-запрос.
+        db_users (Annotated[AsyncSession, Depends(get_user_session)]): Подключение к базе данных.
+        db_sessions (Annotated[AsyncSession, Depends(get_sessions_session)]): Объект сессии.
+    
+    Возвращает:
+        Any: Результат выполнения функции.
+    """
+
     body = await request.json()
 
     game_state = body.get("gameState", "InMenus")

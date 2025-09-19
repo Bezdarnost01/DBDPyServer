@@ -8,6 +8,15 @@ from utils.users import UserWorker
 
 
 async def main() -> None:
+    """Функция `main` выполняет прикладную задачу приложения.
+    
+    Параметры:
+        Отсутствуют.
+    
+    Возвращает:
+        None: Функция не возвращает значение.
+    """
+
     user_id = "23096e31-f029-40dd-8054-ce80694c4117"
     async with AsyncSession(user_engine) as session:
         # Получаем текущие значения из кошелька (базы)
